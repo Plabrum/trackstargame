@@ -54,3 +54,4 @@ scripts/.venv/
 scripts/venv/
 *.egg-info/
 .pytest_cache/
+scripts/.cache

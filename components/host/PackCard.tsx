@@ -62,14 +62,14 @@ export function PackCard({
         <Button
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           onClick={onStartGame}
-          disabled={isStarting || trackCount < 10}
+          disabled={isStarting || trackCount === 0}
         >
           <Play className="h-4 w-4 mr-2" />
           {isStarting ? "Starting..." : "Start Game"}
         </Button>
-        {trackCount < 10 && (
+        {trackCount === 0 && (
           <p className="text-xs text-muted-foreground text-center">
-            Need at least 10 tracks to start a game
+            Need at least 1 track to start a game
           </p>
         )}
       </CardContent>
