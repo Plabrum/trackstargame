@@ -1,30 +1,19 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Music } from "lucide-react";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  const router = useRouter();
-  const [gameCode, setGameCode] = useState("");
-
-  const handleHostGame = () => {
-    // Redirect to Spotify OAuth
-    signIn("spotify", { callbackUrl: "/host/select-pack" });
-  };
-
-  const handleJoinGame = () => {
-    if (!gameCode.trim()) {
-      return;
+  async function handleJoinGame(formData: FormData) {
+    "use server";
+    const gameCode = formData.get("gameCode") as string;
+    if (gameCode?.trim()) {
+      redirect(`/play/${gameCode.trim()}`);
     }
-    router.push(`/play/${gameCode.trim()}`);
-  };
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-slate-100">
@@ -49,25 +38,21 @@ export default function Home() {
                 Sign in with Spotify to create and host a game session
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center space-y-3 py-4">
-                <Music className="h-16 w-16 mx-auto text-green-600" />
-                <p className="text-sm text-muted-foreground">
-                  Spotify account required for audio playback
-                </p>
-              </div>
+            <CardContent className="flex flex-col justify-center space-y-4 py-12">
+              <form action="/api/auth/signin/spotify" method="GET">
+                <input type="hidden" name="callbackUrl" value="/host/select-pack" />
+                <Button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  size="lg"
+                >
+                  <Music className="h-5 w-5 mr-2" />
+                  Sign in with Spotify
+                </Button>
+              </form>
 
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700"
-                size="lg"
-                onClick={handleHostGame}
-              >
-                <Music className="h-5 w-5 mr-2" />
-                Sign in with Spotify
-              </Button>
-
-              <div className="text-xs text-muted-foreground text-center mt-2">
-                Free or Premium account works. Premium recommended for best experience.
+              <div className="text-xs text-muted-foreground text-center">
+                Requires a premium account for audio playback.
               </div>
             </CardContent>
           </Card>
@@ -81,35 +66,31 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Game code input */}
-              <div className="space-y-2">
-                <Label htmlFor="gameCode">Game Code</Label>
-                <Input
-                  id="gameCode"
-                  placeholder="Enter 6-character code"
-                  value={gameCode}
-                  onChange={(e) => setGameCode(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && gameCode.trim()) {
-                      handleJoinGame();
-                    }
-                  }}
-                  className="text-center text-2xl font-mono tracking-widest"
-                  maxLength={36} // UUID length, but we can use short codes too
-                />
-              </div>
+              <form action={handleJoinGame} className="space-y-4">
+                {/* Game code input */}
+                <div className="space-y-2">
+                  <Label htmlFor="gameCode">Game Code</Label>
+                  <Input
+                    id="gameCode"
+                    name="gameCode"
+                    placeholder="Enter 6-character code"
+                    className="text-center text-2xl font-mono tracking-widest"
+                    maxLength={36}
+                    required
+                  />
+                </div>
 
-              <div className="pt-8">
-                <Button
-                  className="w-full"
-                  size="lg"
-                  variant="secondary"
-                  onClick={handleJoinGame}
-                  disabled={!gameCode.trim()}
-                >
-                  Join Game
-                </Button>
-              </div>
+                <div className="pt-8">
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    size="lg"
+                    variant="secondary"
+                  >
+                    Join Game
+                  </Button>
+                </div>
+              </form>
 
               <Separator className="my-4" />
 

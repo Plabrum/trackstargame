@@ -1,11 +1,30 @@
 /**
- * NextAuth.js middleware to protect host routes.
+ * NextAuth.js v4 middleware to protect host routes.
  *
  * Requires authentication for /host/* pages.
  * Players accessing /play/* don't need authentication.
  */
 
-export { auth as middleware } from '@/lib/auth/config';
+import { withAuth } from 'next-auth/middleware';
+
+export default withAuth({
+  callbacks: {
+    authorized: ({ token, req }) => {
+      const { pathname } = req.nextUrl;
+
+      // Protect /host/* routes
+      if (pathname.startsWith('/host')) {
+        return !!token;
+      }
+
+      // Allow all other routes
+      return true;
+    },
+  },
+  pages: {
+    signIn: '/',
+  },
+});
 
 export const config = {
   matcher: ['/host/:path*'],
