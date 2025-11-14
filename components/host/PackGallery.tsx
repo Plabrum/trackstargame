@@ -49,6 +49,7 @@ export function PackGallery() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ packId }),
       });
 

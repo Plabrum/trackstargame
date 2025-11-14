@@ -2,7 +2,6 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
-import { SessionProvider } from "next-auth/react";
 import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
 import { useHost } from "@/hooks/useHost";
 import { HostLobby } from "@/components/host/HostLobby";
@@ -127,23 +126,21 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   }
 
   return (
-    <SessionProvider>
-      <HostGameController
-        session={session}
-        players={players}
-        currentTrack={currentTrack}
-        buzzerPlayer={buzzerPlayer}
-        elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
-        onStartRound={async () => {
-          await startRound();
-        }}
-        onJudgeCorrect={() => judgeAnswer(true)}
-        onJudgeIncorrect={() => judgeAnswer(false)}
-        onNextRound={nextRound}
-        isStartingRound={isStartingRound}
-        isJudging={isJudging}
-        isAdvancing={isAdvancing}
-      />
-    </SessionProvider>
+    <HostGameController
+      session={session}
+      players={players}
+      currentTrack={currentTrack}
+      buzzerPlayer={buzzerPlayer}
+      elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
+      onStartRound={async () => {
+        await startRound();
+      }}
+      onJudgeCorrect={() => judgeAnswer(true)}
+      onJudgeIncorrect={() => judgeAnswer(false)}
+      onNextRound={nextRound}
+      isStartingRound={isStartingRound}
+      isJudging={isJudging}
+      isAdvancing={isAdvancing}
+    />
   );
 }

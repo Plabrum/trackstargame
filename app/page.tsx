@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Music } from "lucide-react";
 import { redirect } from "next/navigation";
+import { getSpotifyAuthUrl } from "@/lib/spotify-auth";
+import { randomBytes } from "crypto";
 
 export default function Home() {
   async function handleJoinGame(formData: FormData) {
@@ -13,6 +15,13 @@ export default function Home() {
     if (gameCode?.trim()) {
       redirect(`/play/${gameCode.trim()}`);
     }
+  }
+
+  async function handleSpotifyLogin() {
+    "use server";
+    const state = randomBytes(16).toString('hex');
+    const authUrl = getSpotifyAuthUrl(state);
+    redirect(authUrl);
   }
 
   return (
@@ -39,8 +48,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col justify-center space-y-4 py-12">
-              <form action="/api/auth/signin/spotify" method="GET">
-                <input type="hidden" name="callbackUrl" value="/host/select-pack" />
+              <form action={handleSpotifyLogin}>
                 <Button
                   type="submit"
                   className="w-full bg-green-600 hover:bg-green-700"

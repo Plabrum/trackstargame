@@ -8,7 +8,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import { HostGameView } from "./HostGameView";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,9 +34,30 @@ interface HostGameControllerProps {
 }
 
 export function HostGameController(props: HostGameControllerProps) {
-  const { data: authSession, status: authStatus } = useSession();
+  const [accessToken, setAccessToken] = useState<string>('');
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const hasStartedPlayingRef = useRef(false);
+
+  // Fetch access token from API
+  useEffect(() => {
+    fetch('/api/spotify/token')
+      .then(res => res.json())
+      .then(data => {
+        if (data.accessToken) {
+          setAccessToken(data.accessToken);
+        } else {
+          setPlayerError('No Spotify access token found. Please sign in again.');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to get access token:', err);
+        setPlayerError('Failed to get Spotify access token');
+      })
+      .finally(() => {
+        setIsLoadingAuth(false);
+      });
+  }, []);
 
   // Get spotify_id from current track
   const currentSpotifyId = props.currentTrack?.spotify_id || null;
@@ -51,7 +71,7 @@ export function HostGameController(props: HostGameControllerProps) {
     play,
     pause,
   } = useSpotifyPlayer({
-    accessToken: authSession?.accessToken || '',
+    accessToken,
     deviceName: 'Trackstar Game',
     onReady: () => {
       console.log('Spotify player ready');
@@ -118,29 +138,8 @@ export function HostGameController(props: HostGameControllerProps) {
     }
   };
 
-  // Show auth error if not signed in
-  if (authStatus === 'unauthenticated') {
-    return (
-      <div className="container mx-auto p-6 max-w-2xl">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You must be signed in with Spotify to host a game.
-            <br />
-            <Button
-              onClick={() => window.location.href = '/api/auth/signin'}
-              className="mt-4"
-            >
-              Sign in with Spotify
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  // Show loading while auth is loading
-  if (authStatus === 'loading' || !authSession) {
+  // Show loading while fetching auth
+  if (isLoadingAuth) {
     return (
       <div className="container mx-auto p-6 max-w-2xl">
         <Alert>

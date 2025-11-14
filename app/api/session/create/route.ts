@@ -17,18 +17,36 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { auth } from '@/lib/auth/config';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
     // Verify host is authenticated with Spotify
-    const session = await auth();
-    if (!session?.user) {
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('spotify_access_token')?.value;
+
+    if (!accessToken) {
       return NextResponse.json(
         { error: 'Host must be authenticated with Spotify' },
         { status: 401 }
       );
     }
+
+    // Fetch user info from Spotify
+    const userResponse = await fetch('https://api.spotify.com/v1/me', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      return NextResponse.json(
+        { error: 'Failed to verify Spotify authentication' },
+        { status: 401 }
+      );
+    }
+
+    const spotifyUser = await userResponse.json();
 
     const body = await request.json();
     const { packId } = body;
@@ -41,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     // Use authenticated user's name as host name
-    const hostName = session.user.name || session.user.email || 'Host';
+    const hostName = spotifyUser.display_name || spotifyUser.email || 'Host';
 
     // Verify pack exists
     const supabase = await createClient();
