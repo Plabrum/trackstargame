@@ -6,6 +6,13 @@
 
 import { createClient } from '@/lib/supabase/server';
 
+/**
+ * Get the channel name for a game session.
+ */
+export function getGameChannelName(sessionId: string): string {
+  return `game:${sessionId}`;
+}
+
 // Event types that can be broadcast
 export type GameEvent =
   | {
@@ -82,7 +89,8 @@ export async function broadcastGameEvent(
 ): Promise<void> {
   const supabase = await createClient();
 
-  const channel = supabase.channel(`game:${sessionId}`);
+  const channelName = getGameChannelName(sessionId);
+  const channel = supabase.channel(channelName);
 
   await channel.send({
     type: 'broadcast',
