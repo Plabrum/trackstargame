@@ -25,10 +25,12 @@ interface HostGameViewProps {
   onJudgeIncorrect: () => void;
   onNextRound: () => void;
   onRevealTrack?: () => void;
+  onEndGame?: () => void;
   isStartingRound: boolean;
   isJudging: boolean;
   isAdvancing: boolean;
   isRevealing?: boolean;
+  isEndingGame?: boolean;
 }
 
 export function HostGameView({
@@ -42,10 +44,12 @@ export function HostGameView({
   onJudgeIncorrect,
   onNextRound,
   onRevealTrack,
+  onEndGame,
   isStartingRound,
   isJudging,
   isAdvancing,
   isRevealing,
+  isEndingGame,
 }: HostGameViewProps) {
   const currentRound = session.current_round || 0;
   const totalRounds = 10;
@@ -80,11 +84,24 @@ export function HostGameView({
           <h1 className="text-3xl font-bold">Round {currentRound} / {totalRounds}</h1>
           <p className="text-muted-foreground">Host Controls</p>
         </div>
-        <Badge variant="outline" className="text-lg px-4 py-2">
-          {state === 'playing' && 'Playing'}
-          {state === 'buzzed' && 'Buzzed!'}
-          {state === 'reveal' && 'Revealed'}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="text-lg px-4 py-2">
+            {state === 'playing' && 'Playing'}
+            {state === 'buzzed' && 'Buzzed!'}
+            {state === 'reveal' && 'Revealed'}
+          </Badge>
+          {onEndGame && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEndGame}
+              disabled={isEndingGame}
+              className="text-destructive hover:text-destructive"
+            >
+              {isEndingGame ? "Ending..." : "End Game"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -193,8 +210,8 @@ export function HostGameView({
                 </div>
               )}
 
-              {/* Before Starting */}
-              {(state === 'lobby' || (state === 'playing' && currentRound === 0)) && (
+              {/* Before Starting Round 1 - show when in playing state but round hasn't started yet */}
+              {state === 'playing' && !session.round_start_time && (
                 <Button
                   size="lg"
                   className="w-full"
@@ -205,6 +222,7 @@ export function HostGameView({
                   {isStartingRound ? "Starting..." : "Start Round"}
                 </Button>
               )}
+
             </CardContent>
           </Card>
 

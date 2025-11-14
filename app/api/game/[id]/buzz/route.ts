@@ -93,6 +93,13 @@ export async function POST(
     const startTime = new Date(session.round_start_time);
     const elapsedSeconds = (buzzTime.getTime() - startTime.getTime()) / 1000;
 
+    console.log('Buzz timing:', {
+      buzzTime: buzzTime.toISOString(),
+      startTime: startTime.toISOString(),
+      elapsedMs: buzzTime.getTime() - startTime.getTime(),
+      elapsedSeconds
+    });
+
     // Atomic first-buzz-wins: Update game_rounds table
     // Only update if buzzer_player_id is NULL (no one has buzzed yet)
     const { data: round, error: roundError } = await supabase

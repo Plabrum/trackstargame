@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
 import { useHost } from "@/hooks/useHost";
@@ -11,11 +11,56 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { toast } = useToast();
+
+  // Fetch Spotify access token (initialize once at page level)
+  const [accessToken, setAccessToken] = useState<string>('');
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/spotify/token')
+      .then(res => res.json())
+      .then(data => {
+        if (data.accessToken) {
+          setAccessToken(data.accessToken);
+        } else {
+          setPlayerError('No Spotify access token found. Please sign in again.');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to get access token:', err);
+        setPlayerError('Failed to get Spotify access token');
+      })
+      .finally(() => {
+        setIsLoadingAuth(false);
+      });
+  }, []);
+
+  // Initialize Spotify player once at page level (persists across game states)
+  const spotifyPlayer = useSpotifyPlayer({
+    accessToken,
+    deviceName: 'Trackstar Game',
+    onReady: () => {
+      console.log('Spotify player ready');
+      setPlayerError(null);
+    },
+    onError: (error) => {
+      console.error('Spotify error:', error);
+      setPlayerError(error);
+    },
+    onTrackEnd: () => {
+      console.log('Track ended naturally');
+    },
+    onPlaybackChange: (state) => {
+      console.log('Playback state:', state);
+    },
+  });
 
   // Fetch game data
   const { data: session, isLoading: isLoadingSession, error: sessionError } = useGameSession(id);
@@ -49,11 +94,13 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     judgeAnswer,
     nextRound,
     revealTrack,
+    endGame,
     isStartingGame,
     isStartingRound,
     isJudging,
     isAdvancing,
     isRevealing,
+    isEndingGame,
   } = useHost(id, {
     onBuzz: (event) => {
       toast({
@@ -76,7 +123,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   });
 
   // Loading state
-  if (isLoadingSession || isLoadingPlayers) {
+  if (isLoadingSession || isLoadingPlayers || isLoadingAuth) {
     return (
       <div className="container mx-auto p-6 max-w-4xl space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -137,14 +184,22 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       onStartRound={async () => {
         await startRound();
       }}
-      onJudgeCorrect={() => judgeAnswer(true)}
-      onJudgeIncorrect={() => judgeAnswer(false)}
+      onJudgeCorrect={() => {
+        judgeAnswer(true);
+      }}
+      onJudgeIncorrect={() => {
+        judgeAnswer(false);
+      }}
       onNextRound={nextRound}
       onRevealTrack={revealTrack}
+      onEndGame={endGame}
       isStartingRound={isStartingRound}
       isJudging={isJudging}
       isAdvancing={isAdvancing}
       isRevealing={isRevealing}
+      isEndingGame={isEndingGame}
+      spotifyPlayer={spotifyPlayer}
+      playerError={playerError}
     />
   );
 }

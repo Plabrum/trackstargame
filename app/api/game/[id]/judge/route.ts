@@ -76,7 +76,8 @@ export async function POST(
 
     // If someone buzzed, calculate points
     if (buzzerPlayerId && round.elapsed_seconds != null) {
-      pointsAwarded = calculatePoints(round.elapsed_seconds, correct);
+      pointsAwarded = calculatePoints(Number(round.elapsed_seconds), correct);
+      console.log('Awarding points:', { buzzerPlayerId, pointsAwarded, correct, elapsed: round.elapsed_seconds });
 
       // Update player score
       const { error: scoreError } = await supabase.rpc('increment_player_score', {
@@ -85,29 +86,49 @@ export async function POST(
       });
 
       if (scoreError) {
+        console.log('RPC error, using fallback:', scoreError);
         // Fallback to manual update if RPC doesn't exist
-        const { data: player } = await supabase
+        const { data: player, error: fetchError } = await supabase
           .from('players')
           .select('score')
           .eq('id', buzzerPlayerId)
           .single();
 
-        if (player) {
-          await supabase
+        if (fetchError) {
+          console.error('Failed to fetch player for score update:', fetchError);
+        } else if (player) {
+          const newScore = (player.score || 0) + pointsAwarded;
+          console.log('Updating player score:', { oldScore: player.score, pointsAwarded, newScore });
+
+          const { error: updateError } = await supabase
             .from('players')
-            .update({ score: player.score + pointsAwarded })
+            .update({ score: newScore })
             .eq('id', buzzerPlayerId);
+
+          if (updateError) {
+            console.error('Failed to update player score:', updateError);
+          }
         }
+      } else {
+        console.log('Score updated successfully via RPC');
       }
 
       // Update round with result
-      await supabase
+      const { error: roundUpdateError } = await supabase
         .from('game_rounds')
         .update({
           correct,
           points_awarded: pointsAwarded,
         })
         .eq('id', round.id) as { error: any };
+
+      if (roundUpdateError) {
+        console.error('Failed to update round:', roundUpdateError);
+      } else {
+        console.log('Round updated with result');
+      }
+    } else {
+      console.log('No buzzer or elapsed time, skipping points');
     }
 
     // Update session state to 'reveal'

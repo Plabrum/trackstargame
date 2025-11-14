@@ -2,14 +2,22 @@
 /**
  * POST /api/game/[id]/next-round
  *
- * Advance to next round or finish game (host only).
+ * Advance to next round and start it, or finish game (host only).
+ * This automatically selects a track and starts the round.
  *
- * Response:
+ * Response (if advancing):
  * {
- *   state: 'playing' | 'finished';
- *   roundNumber?: number; // if advancing
- *   leaderboard?: Array; // if finished
- *   winner?: { playerId, playerName, score }; // if finished
+ *   state: 'playing';
+ *   roundNumber: number;
+ *   trackId: string;
+ *   spotify_id: string;
+ * }
+ *
+ * Response (if finished):
+ * {
+ *   state: 'finished';
+ *   leaderboard: Array;
+ *   winner: { playerId, playerName, score };
  * }
  */
 
@@ -100,12 +108,56 @@ export async function POST(
       { currentRound: session.current_round }
     );
 
+    // Get session pack_id for track selection
+    const { data: sessionDetails, error: detailsError } = await supabase
+      .from('game_sessions')
+      .select('pack_id')
+      .eq('id', sessionId)
+      .single();
+
+    if (detailsError || !sessionDetails) {
+      return NextResponse.json({ error: 'Failed to fetch session details' }, { status: 500 });
+    }
+
+    // Get tracks already used in this session
+    const { data: usedRounds } = await supabase
+      .from('game_rounds')
+      .select('track_id')
+      .eq('session_id', sessionId);
+
+    const usedTrackIds = usedRounds?.map((r) => r.track_id) || [];
+
+    // Get a random unused track from the pack
+    let query = supabase
+      .from('tracks')
+      .select('id, title, artist, spotify_id')
+      .eq('pack_id', sessionDetails.pack_id);
+
+    if (usedTrackIds.length > 0) {
+      query = query.not('id', 'in', `(${usedTrackIds.join(',')})`);
+    }
+
+    const { data: tracks, error: tracksError } = await query;
+
+    if (tracksError || !tracks || tracks.length === 0) {
+      console.error('Failed to fetch tracks:', tracksError);
+      return NextResponse.json(
+        { error: 'No available tracks in pack' },
+        { status: 404 }
+      );
+    }
+
+    // Select random track
+    const track = tracks[Math.floor(Math.random() * tracks.length)];
+
+    // Update session with new round and start time
+    const roundStartTime = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('game_sessions')
       .update({
         state: newState,
         current_round: nextRound,
-        round_start_time: null, // Reset for new round
+        round_start_time: roundStartTime,
       })
       .eq('id', sessionId) as { error: any };
 
@@ -117,12 +169,32 @@ export async function POST(
       );
     }
 
-    // Broadcast state change
+    // Create round record
+    const { error: roundError } = await supabase
+      .from('game_rounds')
+      .insert({
+        session_id: sessionId,
+        round_number: nextRound,
+        track_id: track.id,
+      }) as { error: any };
+
+    if (roundError) {
+      console.error('Failed to create round:', roundError);
+    }
+
+    // Broadcast state change and round start event
     await broadcastStateChange(sessionId, newState);
+    await broadcastGameEvent(sessionId, {
+      type: 'round_start',
+      roundNumber: nextRound,
+      trackId: track.id,
+    });
 
     return NextResponse.json({
       state: newState,
       roundNumber: nextRound,
+      trackId: track.id,
+      spotify_id: track.spotify_id,
     });
   } catch (error) {
     console.error('Error in POST /api/game/[id]/next-round:', error);

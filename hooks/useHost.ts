@@ -59,8 +59,11 @@ export function useNextRound() {
       return response.json();
     },
     onSuccess: (_, sessionId) => {
-      // Invalidate game state
+      // Invalidate game state and rounds (to fetch new track)
       queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ['game_sessions', sessionId, 'rounds'],
+      });
     },
   });
 }
@@ -92,6 +95,33 @@ export function useRevealTrack() {
 }
 
 /**
+ * End the game early (host only).
+ */
+export function useEndGame() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch(`/api/game/${sessionId}/end`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Failed to end game');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, sessionId) => {
+      // Invalidate game state and players
+      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId, 'players'] });
+    },
+  });
+}
+
+/**
  * Hook for host controls and real-time updates.
  *
  * Provides all host-specific actions and subscribes to game events.
@@ -111,6 +141,7 @@ export function useHost(
   const judgeAnswer = useJudgeAnswer();
   const nextRound = useNextRound();
   const revealTrack = useRevealTrack();
+  const endGame = useEndGame();
 
   // Default event handlers that invalidate queries
   const defaultHandlers: GameEventHandlers = {
@@ -278,11 +309,20 @@ export function useHost(
       [sessionId, revealTrack]
     ),
 
+    endGame: useCallback(
+      () => {
+        if (!sessionId) throw new Error('No session ID');
+        return endGame.mutate(sessionId);
+      },
+      [sessionId, endGame]
+    ),
+
     // Mutation states
     isStartingGame: startGame.isPending,
     isStartingRound: startRound.isPending,
     isJudging: judgeAnswer.isPending,
     isAdvancing: nextRound.isPending,
     isRevealing: revealTrack.isPending,
+    isEndingGame: endGame.isPending,
   };
 }

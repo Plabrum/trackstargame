@@ -7,13 +7,12 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { HostGameView } from "./HostGameView";
-import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Music, AlertTriangle } from "lucide-react";
 import type { Tables } from "@/lib/types/database";
+import type { UseSpotifyPlayerReturn } from "@/hooks/useSpotifyPlayer";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
@@ -29,67 +28,30 @@ interface HostGameControllerProps {
   onJudgeIncorrect: () => void;
   onNextRound: () => void;
   onRevealTrack: () => void;
+  onEndGame: () => void;
   isStartingRound: boolean;
   isJudging: boolean;
   isAdvancing: boolean;
   isRevealing: boolean;
+  isEndingGame: boolean;
+  spotifyPlayer: UseSpotifyPlayerReturn;
+  playerError: string | null;
 }
 
 export function HostGameController(props: HostGameControllerProps) {
-  const [accessToken, setAccessToken] = useState<string>('');
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [playerError, setPlayerError] = useState<string | null>(null);
   const hasStartedPlayingRef = useRef(false);
-
-  // Fetch access token from API
-  useEffect(() => {
-    fetch('/api/spotify/token')
-      .then(res => res.json())
-      .then(data => {
-        if (data.accessToken) {
-          setAccessToken(data.accessToken);
-        } else {
-          setPlayerError('No Spotify access token found. Please sign in again.');
-        }
-      })
-      .catch(err => {
-        console.error('Failed to get access token:', err);
-        setPlayerError('Failed to get Spotify access token');
-      })
-      .finally(() => {
-        setIsLoadingAuth(false);
-      });
-  }, []);
 
   // Get spotify_id from current track
   const currentSpotifyId = props.currentTrack?.spotify_id || null;
 
-  // Initialize Spotify player
+  // Destructure Spotify player props (passed from parent)
   const {
-    player,
     isReady,
     isPlaying,
     error: spotifyError,
     play,
     pause,
-  } = useSpotifyPlayer({
-    accessToken,
-    deviceName: 'Trackstar Game',
-    onReady: () => {
-      console.log('Spotify player ready');
-      setPlayerError(null);
-    },
-    onError: (error) => {
-      console.error('Spotify error:', error);
-      setPlayerError(error);
-    },
-    onTrackEnd: () => {
-      console.log('Track ended naturally');
-    },
-    onPlaybackChange: (state) => {
-      console.log('Playback state:', state);
-    },
-  });
+  } = props.spotifyPlayer;
 
   // Auto-play track when round starts
   useEffect(() => {
@@ -107,7 +69,6 @@ export function HostGameController(props: HostGameControllerProps) {
         })
         .catch((err) => {
           console.error('Failed to auto-play:', err);
-          setPlayerError(`Failed to play track: ${err.message}`);
         });
     }
   }, [props.session.state, currentSpotifyId, isReady, play]);
@@ -131,26 +92,9 @@ export function HostGameController(props: HostGameControllerProps) {
 
   // Wrapped startRound that calls the original
   const handleStartRound = async () => {
-    try {
-      hasStartedPlayingRef.current = false; // Reset flag to allow auto-play
-      await props.onStartRound();
-    } catch (error: any) {
-      console.error('Failed to start round:', error);
-      setPlayerError(error.message);
-    }
+    hasStartedPlayingRef.current = false; // Reset flag to allow auto-play
+    await props.onStartRound();
   };
-
-  // Show loading while fetching auth
-  if (isLoadingAuth) {
-    return (
-      <div className="container mx-auto p-6 max-w-2xl">
-        <Alert>
-          <Music className="h-4 w-4 animate-spin" />
-          <AlertDescription>Loading Spotify authentication...</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -167,12 +111,12 @@ export function HostGameController(props: HostGameControllerProps) {
       )}
 
       {/* Error Display */}
-      {(playerError || spotifyError) && (
+      {(props.playerError || spotifyError) && (
         <div className="container mx-auto p-6 max-w-2xl mb-6">
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              {playerError || spotifyError}
+              {props.playerError || spotifyError}
               <br />
               <span className="text-sm">
                 Try refreshing the page or signing in again. Spotify Premium may be required for full playback.

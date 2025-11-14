@@ -30,10 +30,11 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Can only reveal from playing state
+    // Can only reveal from playing state (not buzzed)
     if (session.state !== 'playing') {
+      console.log('Cannot reveal - wrong state:', session.state);
       return NextResponse.json(
-        { error: 'Can only reveal during playing state' },
+        { error: `Can only reveal during playing state (current state: ${session.state})` },
         { status: 400 }
       );
     }

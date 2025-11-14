@@ -107,7 +107,12 @@ export class SpotifyPlayer {
     this.player.addListener('ready', ({ device_id }) => {
       console.log('Spotify Player Ready', device_id);
       this.deviceId = device_id;
-      this.callbacks.onReady?.();
+
+      // Longer delay to ensure Spotify servers register the device
+      // The device needs time to propagate through Spotify's systems
+      setTimeout(() => {
+        this.callbacks.onReady?.();
+      }, 2000);
     });
 
     // Not Ready
@@ -173,27 +178,53 @@ export class SpotifyPlayer {
       ? spotifyIdOrUri
       : `spotify:track:${spotifyIdOrUri}`;
 
-    // Start playback via Spotify Web API
-    const response = await fetch('https://api.spotify.com/v1/me/player/play', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.accessToken}`,
-      },
-      body: JSON.stringify({
-        device_id: this.deviceId,
-        uris: [uri],
-        position_ms: 0,
-      }),
-    });
+    // Retry logic for device activation
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        // Start playback via Spotify Web API
+        const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+          body: JSON.stringify({
+            device_id: this.deviceId,
+            uris: [uri],
+            position_ms: 0,
+          }),
+        });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to start playback: ${error}`);
+        if (!response.ok) {
+          const error = await response.text();
+
+          // If device not found, wait and retry
+          if (error.includes('NO_ACTIVE_DEVICE') && attempt < 4) {
+            const delay = (attempt + 1) * 1000; // 1s, 2s, 3s, 4s
+            console.log(`Device not active yet, retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            lastError = new Error(`Failed to start playback: ${error}`);
+            continue;
+          }
+
+          throw new Error(`Failed to start playback: ${error}`);
+        }
+
+        // Success! Record start time
+        this.startTime = Date.now();
+        return;
+      } catch (err) {
+        lastError = err as Error;
+        if (attempt < 4) {
+          const delay = (attempt + 1) * 1000; // 1s, 2s, 3s, 4s
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
 
-    // Record start time
-    this.startTime = Date.now();
+    // All retries failed
+    throw lastError || new Error('Failed to start playback after retries');
   }
 
   /**

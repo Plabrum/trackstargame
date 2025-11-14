@@ -28,18 +28,32 @@ export async function broadcastGameEvent(
   const channelName = getGameChannelName(sessionId);
   const channel = supabase.channel(channelName);
 
-  // Subscribe to the channel first
-  await channel.subscribe();
+  // Use httpSend for REST API delivery (recommended approach)
+  // This sends the message via REST without requiring a WebSocket subscription
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/api/broadcast`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            topic: channelName,
+            event: event.type,
+            payload: event,
+          },
+        ],
+      }),
+    }
+  );
 
-  // Send the broadcast event
-  await channel.send({
-    type: 'broadcast',
-    event: event.type,
-    payload: event,
-  });
-
-  // Unsubscribe after sending
-  await supabase.removeChannel(channel);
+  if (!response.ok) {
+    throw new Error(`Failed to broadcast message: ${response.statusText}`);
+  }
 }
 
 /**

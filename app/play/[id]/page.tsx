@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
 import { useJoinSession } from "@/hooks/mutations/use-game-mutations";
 import { usePlayer } from "@/hooks/usePlayer";
@@ -32,6 +33,23 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   const { data: session, isLoading: isLoadingSession, error: sessionError } = useGameSession(id);
   const { data: players = [], isLoading: isLoadingPlayers } = useGamePlayers(id);
   const { data: rounds = [] } = useGameRounds(id);
+
+  // Get current round data (needed for track query - must be before early returns)
+  const currentRound = rounds.find((r) => r.round_number === session?.current_round);
+
+  // Fetch track details for current round (must be before early returns)
+  const { data: currentTrack } = useQuery({
+    queryKey: ['tracks', currentRound?.track_id],
+    queryFn: async () => {
+      if (!currentRound?.track_id) return null;
+
+      const response = await fetch(`/api/tracks/${currentRound.track_id}`);
+      if (!response.ok) return null;
+
+      return response.json();
+    },
+    enabled: !!currentRound?.track_id && !!session && (session.state === 'buzzed' || session.state === 'reveal'),
+  });
 
   // Join session mutation
   const joinSession = useJoinSession();
@@ -117,19 +135,13 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     );
   }
 
-  // Get current round data
-  const currentRound = rounds.find((r) => r.round_number === session.current_round);
+  // Get buzzer player
   const buzzerPlayer = currentRound?.buzzer_player_id
     ? players.find((p) => p.id === currentRound.buzzer_player_id)
     : null;
 
-  // Track info (placeholder - would fetch from DB)
-  const currentTrack = session.state === 'reveal' || session.state === 'buzzed'
-    ? { title: "Track Title", artist: "Artist Name" }
-    : null;
-
-  // Check if player can buzz
-  const canBuzz = session.state === 'playing' && !buzzerPlayer;
+  // Check if player can buzz - requires playing state, no buzzer, and round must have started
+  const canBuzz = session.state === 'playing' && !buzzerPlayer && !!session.round_start_time;
 
   // Render appropriate view based on game state
   if (session.state === 'finished') {

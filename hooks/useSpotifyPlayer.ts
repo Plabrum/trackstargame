@@ -20,7 +20,7 @@ interface UseSpotifyPlayerOptions {
   onPlaybackChange?: (state: SpotifyPlayerState) => void;
 }
 
-interface UseSpotifyPlayerReturn {
+export interface UseSpotifyPlayerReturn {
   player: SpotifyPlayer | null;
   isReady: boolean;
   isPlaying: boolean;
@@ -43,8 +43,9 @@ export function useSpotifyPlayer(
 
   // Initialize player
   useEffect(() => {
+    // Don't show error if token hasn't been fetched yet (empty string)
     if (!options.accessToken) {
-      setError('No access token provided');
+      console.log('Waiting for access token...');
       return;
     }
 

@@ -146,6 +146,7 @@ export function useJudgeAnswer() {
       sessionId: string;
       correct: boolean;
     }) => {
+      console.log('Judging answer:', params);
       const response = await fetch(`/api/game/${params.sessionId}/judge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,12 +155,16 @@ export function useJudgeAnswer() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to judge answer');
+        console.error('Judge API error:', error);
+        throw new Error(error.error || error.message || 'Failed to judge answer');
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log('Judge API result:', result);
+      return result;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
+      console.log('Judge success, invalidating queries');
       // Invalidate players to update scores
       queryClient.invalidateQueries({
         queryKey: ['game_sessions', variables.sessionId, 'players'],
@@ -168,6 +173,13 @@ export function useJudgeAnswer() {
       queryClient.invalidateQueries({
         queryKey: ['game_sessions', variables.sessionId, 'rounds'],
       });
+      // Also invalidate session to update state
+      queryClient.invalidateQueries({
+        queryKey: ['game_sessions', variables.sessionId],
+      });
+    },
+    onError: (error) => {
+      console.error('Judge mutation error:', error);
     },
   });
 }
