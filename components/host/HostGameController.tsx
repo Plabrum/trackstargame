@@ -28,9 +28,11 @@ interface HostGameControllerProps {
   onJudgeCorrect: () => void;
   onJudgeIncorrect: () => void;
   onNextRound: () => void;
+  onRevealTrack: () => void;
   isStartingRound: boolean;
   isJudging: boolean;
   isAdvancing: boolean;
+  isRevealing: boolean;
 }
 
 export function HostGameController(props: HostGameControllerProps) {

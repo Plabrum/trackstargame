@@ -66,6 +66,32 @@ export function useNextRound() {
 }
 
 /**
+ * Reveal track without buzzing (timeout/skip).
+ */
+export function useRevealTrack() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch(`/api/game/${sessionId}/reveal`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Failed to reveal track');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, sessionId) => {
+      // Invalidate game state
+      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
+    },
+  });
+}
+
+/**
  * Hook for host controls and real-time updates.
  *
  * Provides all host-specific actions and subscribes to game events.
@@ -84,6 +110,7 @@ export function useHost(
   const startRound = useStartRound();
   const judgeAnswer = useJudgeAnswer();
   const nextRound = useNextRound();
+  const revealTrack = useRevealTrack();
 
   // Default event handlers that invalidate queries
   const defaultHandlers: GameEventHandlers = {
@@ -243,10 +270,19 @@ export function useHost(
       [sessionId, nextRound]
     ),
 
+    revealTrack: useCallback(
+      () => {
+        if (!sessionId) throw new Error('No session ID');
+        return revealTrack.mutate(sessionId);
+      },
+      [sessionId, revealTrack]
+    ),
+
     // Mutation states
     isStartingGame: startGame.isPending,
     isStartingRound: startRound.isPending,
     isJudging: judgeAnswer.isPending,
     isAdvancing: nextRound.isPending,
+    isRevealing: revealTrack.isPending,
   };
 }

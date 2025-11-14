@@ -24,9 +24,11 @@ interface HostGameViewProps {
   onJudgeCorrect: () => void;
   onJudgeIncorrect: () => void;
   onNextRound: () => void;
+  onRevealTrack?: () => void;
   isStartingRound: boolean;
   isJudging: boolean;
   isAdvancing: boolean;
+  isRevealing?: boolean;
 }
 
 export function HostGameView({
@@ -39,9 +41,11 @@ export function HostGameView({
   onJudgeCorrect,
   onJudgeIncorrect,
   onNextRound,
+  onRevealTrack,
   isStartingRound,
   isJudging,
   isAdvancing,
+  isRevealing,
 }: HostGameViewProps) {
   const currentRound = session.current_round || 0;
   const totalRounds = 10;
@@ -97,14 +101,28 @@ export function HostGameView({
             <CardContent className="space-y-4">
               {/* Playing State */}
               {state === 'playing' && (
-                <Alert>
-                  <AlertDescription className="text-center py-4">
-                    <p className="text-lg font-semibold">Music is playing...</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Waiting for a player to buzz in
-                    </p>
-                  </AlertDescription>
-                </Alert>
+                <div className="space-y-4">
+                  <Alert>
+                    <AlertDescription className="text-center py-4">
+                      <p className="text-lg font-semibold">Music is playing...</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Waiting for a player to buzz in
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                  {onRevealTrack && (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full"
+                      onClick={onRevealTrack}
+                      disabled={isRevealing}
+                    >
+                      <XCircle className="h-5 w-5 mr-2" />
+                      {isRevealing ? "Stopping..." : "Stop & Reveal Answer"}
+                    </Button>
+                  )}
+                </div>
               )}
 
               {/* Buzzed State */}
@@ -145,13 +163,24 @@ export function HostGameView({
               )}
 
               {/* Reveal State */}
-              {state === 'reveal' && currentTrack && (
+              {state === 'reveal' && (
                 <div className="space-y-4">
-                  <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-2">Track Revealed</p>
-                    <p className="text-2xl font-bold">{currentTrack.title}</p>
-                    <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
-                  </div>
+                  {currentTrack ? (
+                    <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-2">Track Revealed</p>
+                      <p className="text-2xl font-bold">{currentTrack.title}</p>
+                      <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
+                    </div>
+                  ) : (
+                    <Alert>
+                      <AlertDescription className="text-center py-4">
+                        <p className="text-lg font-semibold">Round Complete</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Ready for next round
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   <Button
                     size="lg"

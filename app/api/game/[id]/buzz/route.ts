@@ -33,7 +33,10 @@ export async function POST(
     const body = await request.json();
     const { playerId } = body;
 
+    console.log('Buzz request:', { sessionId, playerId });
+
     if (!playerId) {
+      console.log('Missing playerId');
       return NextResponse.json(
         { error: 'playerId is required' },
         { status: 400 }
@@ -50,11 +53,15 @@ export async function POST(
       .single();
 
     if (sessionError || !session) {
+      console.log('Session not found:', sessionError);
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
+    console.log('Session state:', session);
+
     // Validate game state allows buzzing
     if (!canBuzz(session.state as any)) {
+      console.log('Cannot buzz in state:', session.state);
       return NextResponse.json(
         { error: 'Cannot buzz in current game state', state: session.state },
         { status: 400 }
@@ -62,6 +69,7 @@ export async function POST(
     }
 
     if (!session.round_start_time) {
+      console.log('Round has not started');
       return NextResponse.json(
         { error: 'Round has not started' },
         { status: 400 }

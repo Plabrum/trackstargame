@@ -48,10 +48,12 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     startRound,
     judgeAnswer,
     nextRound,
+    revealTrack,
     isStartingGame,
     isStartingRound,
     isJudging,
     isAdvancing,
+    isRevealing,
   } = useHost(id, {
     onBuzz: (event) => {
       toast({
@@ -138,9 +140,11 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       onJudgeCorrect={() => judgeAnswer(true)}
       onJudgeIncorrect={() => judgeAnswer(false)}
       onNextRound={nextRound}
+      onRevealTrack={revealTrack}
       isStartingRound={isStartingRound}
       isJudging={isJudging}
       isAdvancing={isAdvancing}
+      isRevealing={isRevealing}
     />
   );
 }
