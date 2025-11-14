@@ -69,13 +69,14 @@ export function AnimatedScore({ score, className = "" }: AnimatedScoreProps) {
   return (
     <motion.span
       key={score}
-      initial={{ scale: 1.5, color: "#10b981" }}
-      animate={{ scale: 1, color: "inherit" }}
+      initial={{ scale: 1.5 }}
+      animate={{ scale: 1 }}
       transition={{
-        scale: { type: "spring", stiffness: 300, damping: 20 },
-        color: { duration: 0.5 },
+        type: "spring",
+        stiffness: 300,
+        damping: 20
       }}
-      className={className}
+      className={`${className} text-green-500 transition-colors duration-500`}
     >
       {score}
     </motion.span>

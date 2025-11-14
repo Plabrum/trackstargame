@@ -56,13 +56,13 @@ export async function POST(
       );
     }
 
-    // Check current player count
+    // Check current player count (max 10 players)
     const { count } = await supabase
       .from('players')
       .select('*', { count: 'exact', head: true })
       .eq('session_id', sessionId);
 
-    if (count !== null && !isValidPlayerCount(count + 1)) {
+    if (count !== null && count >= 10) {
       return NextResponse.json(
         { error: 'Game is full (maximum 10 players)' },
         { status: 400 }

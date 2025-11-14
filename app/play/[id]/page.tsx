@@ -77,6 +77,13 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
             description: "You've successfully joined the game",
           });
         },
+        onError: (error) => {
+          toast({
+            title: "Failed to join",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
       }
     );
   };

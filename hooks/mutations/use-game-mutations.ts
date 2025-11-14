@@ -65,7 +65,7 @@ export function useJoinSession() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to join session');
+        throw new Error(error.error || error.message || 'Failed to join session');
       }
 
       const data = await response.json();

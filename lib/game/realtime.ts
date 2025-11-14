@@ -28,11 +28,18 @@ export async function broadcastGameEvent(
   const channelName = getGameChannelName(sessionId);
   const channel = supabase.channel(channelName);
 
+  // Subscribe to the channel first
+  await channel.subscribe();
+
+  // Send the broadcast event
   await channel.send({
     type: 'broadcast',
     event: event.type,
     payload: event,
   });
+
+  // Unsubscribe after sending
+  await supabase.removeChannel(channel);
 }
 
 /**

@@ -49,17 +49,20 @@ export class SpotifyPlayer {
       return;
     }
 
+    // Set up the callback BEFORE loading the SDK
+    const sdkReadyPromise = new Promise<void>((resolve) => {
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        resolve();
+      };
+    });
+
     // Load Spotify SDK script
     if (!window.Spotify) {
       await this.loadSpotifySDK();
     }
 
     // Wait for SDK to be ready
-    await new Promise<void>((resolve) => {
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        resolve();
-      };
-    });
+    await sdkReadyPromise;
 
     // Create player instance
     this.player = new window.Spotify.Player({
