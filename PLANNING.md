@@ -31,8 +31,9 @@ Trackstar is a multiplayer music guessing game (2-10 players) with buzz-in mecha
 4. **Single device audio** - Host's device plays audio, simpler implementation for in-person gameplay
 5. **Python scripts for content** - Scrape Trackstar videos, populate database with Spotify track IDs
 6. **Shadcn UI** - Pre-built accessible components for rapid development
-7. **Speed-based scoring** - Reward fast recognition, penalize wrong answers
-8. **CI/CD from start** - Automated testing and deployment
+7. **TanStack Query** - Better than useEffect for data fetching; automatic caching, real-time updates, and loading states
+8. **Speed-based scoring** - Reward fast recognition, penalize wrong answers
+9. **CI/CD from start** - Automated testing and deployment
 
 ---
 
@@ -40,6 +41,7 @@ Trackstar is a multiplayer music guessing game (2-10 players) with buzz-in mecha
 
 ### Tech Stack
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Shadcn UI
+- **State Management**: TanStack Query (React Query) for server state, caching, and real-time sync
 - **Backend**: Next.js API Routes, Supabase (PostgreSQL + Realtime)
 - **Hosting**: Vercel (Frontend), Supabase (Database)
 - **Audio**: Spotify Web Playback SDK (requires host Spotify OAuth)
@@ -174,7 +176,10 @@ Channel: `game:{sessionId}`
      /supabase
      /game-state
      /types
+     /query (TanStack Query setup)
    /hooks
+     /queries (TanStack Query hooks for data fetching)
+     /mutations (TanStack Query hooks for mutations)
    /scripts (Python scripts for DB population)
    ```
 
