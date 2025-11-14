@@ -24,6 +24,7 @@ export interface UseSpotifyPlayerReturn {
   player: SpotifyPlayer | null;
   isReady: boolean;
   isPlaying: boolean;
+  playbackState: SpotifyPlayerState | null;
   error: string | null;
   play: (spotifyId: string) => Promise<void>;
   pause: () => Promise<void>;
@@ -38,6 +39,7 @@ export function useSpotifyPlayer(
 ): UseSpotifyPlayerReturn {
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackState, setPlaybackState] = useState<SpotifyPlayerState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<SpotifyPlayer | null>(null);
 
@@ -67,6 +69,7 @@ export function useSpotifyPlayer(
       },
       onPlaybackChange: (state) => {
         setIsPlaying(state.isPlaying);
+        setPlaybackState(state);
         options.onPlaybackChange?.(state);
       },
     };
@@ -182,6 +185,7 @@ export function useSpotifyPlayer(
     player: playerRef.current,
     isReady,
     isPlaying,
+    playbackState,
     error,
     play,
     pause,

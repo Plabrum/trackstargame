@@ -10,6 +10,15 @@
  * - Valid access token with 'streaming' scope
  */
 
+export interface SpotifyTrackMetadata {
+  uri: string;
+  id: string;
+  name: string;
+  artists: string; // Comma-separated artist names
+  albumName: string;
+  albumArt: string | null; // URL to largest album image
+}
+
 export interface SpotifyPlayerState {
   isReady: boolean;
   isPlaying: boolean;
@@ -17,6 +26,7 @@ export interface SpotifyPlayerState {
   position: number; // Current position in ms
   duration: number; // Track duration in ms
   trackUri: string | null;
+  track: SpotifyTrackMetadata | null;
 }
 
 export interface SpotifyPlayerCallbacks {
@@ -33,6 +43,8 @@ export class SpotifyPlayer {
   private callbacks: SpotifyPlayerCallbacks;
   private startTime: number | null = null;
   private isInitialized = false;
+  private lastPosition = 0;
+  private hasPlayedPastStart = false;
 
   constructor(accessToken: string, callbacks: SpotifyPlayerCallbacks = {}) {
     this.accessToken = accessToken;
@@ -100,6 +112,29 @@ export class SpotifyPlayer {
     });
   }
 
+  /**
+   * Transfer playback to this device to make it the active device.
+   * This is required before you can play tracks on the device.
+   */
+  private async transferPlayback(deviceId: string): Promise<void> {
+    const response = await fetch('https://api.spotify.com/v1/me/player', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify({
+        device_ids: [deviceId],
+        play: false, // Don't start playing immediately
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to transfer playback: ${error}`);
+    }
+  }
+
   private setupEventListeners(): void {
     if (!this.player) return;
 
@@ -108,11 +143,16 @@ export class SpotifyPlayer {
       console.log('Spotify Player Ready', device_id);
       this.deviceId = device_id;
 
-      // Longer delay to ensure Spotify servers register the device
-      // The device needs time to propagate through Spotify's systems
-      setTimeout(() => {
-        this.callbacks.onReady?.();
-      }, 2000);
+      // Transfer playback to this device to make it active
+      this.transferPlayback(device_id)
+        .then(() => {
+          console.log('Playback transferred to device');
+          this.callbacks.onReady?.();
+        })
+        .catch((err) => {
+          console.error('Failed to transfer playback:', err);
+          this.callbacks.onError?.('Failed to activate device. Please try again.');
+        });
     });
 
     // Not Ready
@@ -146,21 +186,45 @@ export class SpotifyPlayer {
     this.player.addListener('player_state_changed', (state) => {
       if (!state) return;
 
+      // Extract track metadata
+      const currentTrack = state.track_window.current_track;
+      const trackMetadata: SpotifyTrackMetadata = {
+        uri: currentTrack.uri,
+        id: currentTrack.id,
+        name: currentTrack.name,
+        artists: currentTrack.artists.map(a => a.name).join(', '),
+        albumName: currentTrack.album.name,
+        albumArt: currentTrack.album.images[0]?.url || null, // Largest image first
+      };
+
       const playerState: SpotifyPlayerState = {
         isReady: true,
         isPlaying: !state.paused,
         isPaused: state.paused,
         position: state.position,
         duration: state.duration,
-        trackUri: state.track_window.current_track.uri,
+        trackUri: currentTrack.uri,
+        track: trackMetadata,
       };
 
       this.callbacks.onPlaybackChange?.(playerState);
 
-      // Track ended
-      if (state.position === 0 && state.paused) {
+      // Track if we've started playing (position > 1 second)
+      if (state.position > 1000) {
+        this.hasPlayedPastStart = true;
+      }
+
+      // Track ended: Only trigger if we've played past start and now at end
+      // Check if position is near end (within 2 seconds) or wrapped back to 0 after playing
+      const nearEnd = state.duration > 0 && state.position >= state.duration - 2000;
+      const wrappedToStart = this.hasPlayedPastStart && state.position === 0 && this.lastPosition > 1000;
+
+      if (state.paused && (nearEnd || wrappedToStart)) {
+        this.hasPlayedPastStart = false; // Reset for next track
         this.callbacks.onTrackEnd?.();
       }
+
+      this.lastPosition = state.position;
     });
   }
 
@@ -178,53 +242,30 @@ export class SpotifyPlayer {
       ? spotifyIdOrUri
       : `spotify:track:${spotifyIdOrUri}`;
 
-    // Retry logic for device activation
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        // Start playback via Spotify Web API
-        const response = await fetch('https://api.spotify.com/v1/me/player/play', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-          body: JSON.stringify({
-            device_id: this.deviceId,
-            uris: [uri],
-            position_ms: 0,
-          }),
-        });
+    // Start playback via Spotify Web API
+    // Device should already be active from transferPlayback call
+    const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify({
+        device_id: this.deviceId,
+        uris: [uri],
+        position_ms: 0,
+      }),
+    });
 
-        if (!response.ok) {
-          const error = await response.text();
-
-          // If device not found, wait and retry
-          if (error.includes('NO_ACTIVE_DEVICE') && attempt < 4) {
-            const delay = (attempt + 1) * 1000; // 1s, 2s, 3s, 4s
-            console.log(`Device not active yet, retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            lastError = new Error(`Failed to start playback: ${error}`);
-            continue;
-          }
-
-          throw new Error(`Failed to start playback: ${error}`);
-        }
-
-        // Success! Record start time
-        this.startTime = Date.now();
-        return;
-      } catch (err) {
-        lastError = err as Error;
-        if (attempt < 4) {
-          const delay = (attempt + 1) * 1000; // 1s, 2s, 3s, 4s
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to start playback: ${error}`);
     }
 
-    // All retries failed
-    throw lastError || new Error('Failed to start playback after retries');
+    // Success! Record start time and reset track end detection
+    this.startTime = Date.now();
+    this.hasPlayedPastStart = false;
+    this.lastPosition = 0;
   }
 
   /**
@@ -298,13 +339,24 @@ export class SpotifyPlayer {
       return null;
     }
 
+    const currentTrack = state.track_window.current_track;
+    const trackMetadata: SpotifyTrackMetadata = {
+      uri: currentTrack.uri,
+      id: currentTrack.id,
+      name: currentTrack.name,
+      artists: currentTrack.artists.map(a => a.name).join(', '),
+      albumName: currentTrack.album.name,
+      albumArt: currentTrack.album.images[0]?.url || null,
+    };
+
     return {
       isReady: true,
       isPlaying: !state.paused,
       isPaused: state.paused,
       position: state.position,
       duration: state.duration,
-      trackUri: state.track_window.current_track.uri,
+      trackUri: currentTrack.uri,
+      track: trackMetadata,
     };
   }
 
@@ -331,6 +383,8 @@ export class SpotifyPlayer {
     this.deviceId = null;
     this.startTime = null;
     this.isInitialized = false;
+    this.hasPlayedPastStart = false;
+    this.lastPosition = 0;
   }
 
   /**

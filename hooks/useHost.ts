@@ -29,12 +29,13 @@ export function useStartRound() {
 
       return response.json();
     },
-    onSuccess: (_, sessionId) => {
+    onSuccess: (data, sessionId) => {
       // Invalidate game state and rounds
       queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
       queryClient.invalidateQueries({
         queryKey: ['game_sessions', sessionId, 'rounds'],
       });
+      // Return data is automatically passed through by mutateAsync
     },
   });
 }

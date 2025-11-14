@@ -9,7 +9,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Play, Music } from "lucide-react";
 import { BuzzAnimation } from "@/components/game/BuzzAnimation";
 import { AnimatedScore } from "@/components/game/ScoreAnimation";
+import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
 import type { Tables } from "@/lib/types/database";
+import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
@@ -31,6 +33,11 @@ interface HostGameViewProps {
   isAdvancing: boolean;
   isRevealing?: boolean;
   isEndingGame?: boolean;
+  // Spotify playback controls
+  playbackState?: SpotifyPlayerState | null;
+  onPlayPause?: () => void;
+  onVolumeChange?: (volume: number) => void;
+  isSpotifyReady?: boolean;
 }
 
 export function HostGameView({
@@ -50,6 +57,10 @@ export function HostGameView({
   isAdvancing,
   isRevealing,
   isEndingGame,
+  playbackState,
+  onPlayPause,
+  onVolumeChange,
+  isSpotifyReady,
 }: HostGameViewProps) {
   const currentRound = session.current_round || 0;
   const totalRounds = 10;
@@ -225,6 +236,16 @@ export function HostGameView({
 
             </CardContent>
           </Card>
+
+          {/* Spotify Playback Controls */}
+          {isSpotifyReady && playbackState?.track && (
+            <SpotifyPlaybackControls
+              playbackState={playbackState}
+              onPlayPause={onPlayPause}
+              onVolumeChange={onVolumeChange}
+              showControls={true}
+            />
+          )}
 
           {/* Track Info (when revealed) */}
           {state === 'reveal' && buzzerPlayer && (

@@ -48,9 +48,12 @@ export function HostGameController(props: HostGameControllerProps) {
   const {
     isReady,
     isPlaying,
+    playbackState,
     error: spotifyError,
     play,
     pause,
+    resume,
+    setVolume,
   } = props.spotifyPlayer;
 
   // Auto-play track when round starts
@@ -90,10 +93,24 @@ export function HostGameController(props: HostGameControllerProps) {
     }
   }, [props.session.state]);
 
-  // Wrapped startRound that calls the original
+  // Wrapped startRound that calls the original and starts playback
   const handleStartRound = async () => {
     hasStartedPlayingRef.current = false; // Reset flag to allow auto-play
-    await props.onStartRound();
+    const result = await props.onStartRound();
+
+    // Immediately start playing the track if we got spotify_id back
+    if (result?.spotify_id && isReady) {
+      console.log('Starting playback immediately after round start:', result.spotify_id);
+      play(result.spotify_id)
+        .then(() => {
+          console.log('Successfully started playback');
+          hasStartedPlayingRef.current = true;
+        })
+        .catch((err) => {
+          console.error('Failed to start playback:', err);
+          // Don't set the flag so auto-play effect can retry
+        });
+    }
   };
 
   return (
@@ -130,6 +147,18 @@ export function HostGameController(props: HostGameControllerProps) {
       <HostGameView
         {...props}
         onStartRound={handleStartRound}
+        playbackState={playbackState}
+        onPlayPause={() => {
+          if (isPlaying) {
+            pause();
+          } else {
+            resume();
+          }
+        }}
+        onVolumeChange={(volume) => {
+          setVolume(volume);
+        }}
+        isSpotifyReady={isReady}
       />
 
       {/* Debug Info (remove in production) */}
