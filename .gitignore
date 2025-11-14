@@ -29,6 +29,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Python scripts env files
+scripts/.env
+
 # Vercel
 .vercel
 
@@ -40,3 +43,14 @@ next-env.d.ts
 supabase/.temp
 supabase/.branches
 .mcp.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+scripts/.venv/
+scripts/venv/
+*.egg-info/
+.pytest_cache/

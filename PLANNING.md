@@ -10,9 +10,10 @@ Trackstar is a multiplayer music guessing game (2-10 players) with buzz-in mecha
 ### Core Features
 - **Game Format**: 10-round buzz-in competition with 2-10 players
 - **Host Role**: One user controls game flow and audio playback
-- **Authentication**: Anonymous sessions (display name only)
-- **Audio Delivery**: Speaker mode (host's device plays audio, in-person gameplay)
-- **Track Management**: Python scripts for populating database (scraping Trackstar videos)
+- **Host Authentication**: Spotify OAuth (Premium account required for full track playback)
+- **Player Authentication**: Anonymous sessions (display name only)
+- **Audio Delivery**: Spotify Web Playback SDK (host's device plays audio, in-person gameplay)
+- **Track Management**: Python scripts for populating database (scraping Trackstar videos, storing Spotify IDs)
 - **Scoring**: Speed-based system (30 - elapsed_seconds for correct, -10 for wrong)
 - **Sync**: Real-time game state via Supabase Realtime
 - **UI Components**: Shadcn UI component library
@@ -24,12 +25,14 @@ Trackstar is a multiplayer music guessing game (2-10 players) with buzz-in mecha
 - Music trivia enthusiasts
 
 ### Key Technical Decisions (MVP)
-1. **No user accounts** - Zero friction to start playing (potential Spotify OAuth for host in future)
-2. **Single device audio** - Host's device plays audio, simpler implementation
-3. **Python scripts for content** - Scrape Trackstar videos, populate database offline
-4. **Shadcn UI** - Pre-built accessible components for rapid development
-5. **Speed-based scoring** - Reward fast recognition, penalize wrong answers
-6. **CI/CD from start** - Automated testing and deployment
+1. **Host Spotify OAuth required** - Hosts must authenticate with Spotify (free or premium account)
+2. **No player accounts** - Zero friction for players to join (anonymous sessions)
+3. **Spotify Web Playback SDK** - Full track playback via host's Spotify account (not just 30s previews)
+4. **Single device audio** - Host's device plays audio, simpler implementation for in-person gameplay
+5. **Python scripts for content** - Scrape Trackstar videos, populate database with Spotify track IDs
+6. **Shadcn UI** - Pre-built accessible components for rapid development
+7. **Speed-based scoring** - Reward fast recognition, penalize wrong answers
+8. **CI/CD from start** - Automated testing and deployment
 
 ---
 
@@ -39,8 +42,9 @@ Trackstar is a multiplayer music guessing game (2-10 players) with buzz-in mecha
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Shadcn UI
 - **Backend**: Next.js API Routes, Supabase (PostgreSQL + Realtime)
 - **Hosting**: Vercel (Frontend), Supabase (Database)
-- **Audio**: HTML5 Audio API with Spotify preview URLs
-- **Data Population**: Python scripts for scraping and DB seeding
+- **Audio**: Spotify Web Playback SDK (requires host Spotify OAuth)
+- **Authentication**: Spotify OAuth for hosts (NextAuth.js)
+- **Data Population**: Python scripts (UV) for scraping YouTube and populating database with Spotify track IDs
 - **CI/CD**: GitHub Actions with Vercel integration
 
 ### Database Schema
@@ -54,13 +58,13 @@ CREATE TABLE packs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tracks: Individual songs with preview URLs
+-- Tracks: Individual songs with Spotify IDs
 CREATE TABLE tracks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   pack_id UUID REFERENCES packs(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   artist TEXT NOT NULL,
-  preview_url TEXT NOT NULL,
+  spotify_id TEXT NOT NULL, -- Spotify track ID for Web Playback SDK
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -140,7 +144,7 @@ Channel: `game:{sessionId}`
 
 ## 🚀 MVP Implementation Plan
 
-### Phase 1: Project Setup (Day 1, Morning)
+### Phase 1: Project Setup (Day 1, Morning) ✅ COMPLETED
 **Goal**: Bootstrapped project with database, UI components, and CI/CD
 
 1. Initialize Next.js 15 with TypeScript, App Router, Tailwind
@@ -174,24 +178,195 @@ Channel: `game:{sessionId}`
    /scripts (Python scripts for DB population)
    ```
 
+#### Phase 1 Completion Report (November 14, 2025)
+
+**Status**: ✅ Successfully Completed
+
+**Deliverables**:
+- ✅ Next.js 15.5.6 with TypeScript, App Router, and Tailwind CSS
+- ✅ Shadcn UI configured with 6 components (Button, Card, Input, Badge, Skeleton, Toast)
+- ✅ Supabase database with complete schema:
+  - 5 tables: packs, tracks, game_sessions, players, game_rounds
+  - Indexes for performance optimization
+  - Auto-updating timestamp triggers
+  - All foreign key relationships established
+- ✅ TypeScript types generated from Supabase schema
+- ✅ Supabase client utilities (browser and server)
+- ✅ Health check API endpoint (`/api/health`)
+- ✅ GitHub Actions CI/CD pipeline configured
+- ✅ Deployed to Vercel with custom domain: https://www.trackstargame.com/
+- ✅ All environment variables configured in Vercel
+
+**Project Structure Created**:
+```
+trackstargame/
+├── .github/workflows/ci.yml       # CI/CD pipeline
+├── app/
+│   ├── api/health/route.ts        # Supabase connection test
+│   ├── host/[id]/page.tsx         # Placeholder host view
+│   ├── play/[id]/page.tsx         # Placeholder player view
+│   ├── layout.tsx                 # Root layout with fonts
+│   ├── page.tsx                   # Home page with health check UI
+│   └── globals.css                # Tailwind + Shadcn styles
+├── components/
+│   ├── ui/                        # Shadcn components
+│   ├── game/.gitkeep             # Ready for Phase 2+
+│   └── host/.gitkeep             # Ready for Phase 2+
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts             # Browser Supabase client
+│   │   └── server.ts             # Server Supabase client
+│   ├── types/
+│   │   └── database.ts           # Generated TypeScript types
+│   └── utils.ts                  # cn() utility for Shadcn
+├── hooks/                        # Ready for Phase 2+
+├── supabase/
+│   └── migrations/
+│       └── 20250114000000_initial_schema.sql
+├── package.json                  # pnpm configuration
+├── tsconfig.json
+├── tailwind.config.ts
+└── next.config.ts
+```
+
+**Technical Validation**:
+- ✅ TypeScript compilation: No errors
+- ✅ ESLint checks: Passing
+- ✅ Production build: Successful
+- ✅ Supabase connection: Verified (0 packs in database)
+- ✅ Health check endpoint: 200 OK response
+- ✅ GitHub Actions: Pipeline configured and ready
+- ✅ Vercel deployment: Live and accessible
+
+**Issues Encountered & Resolved**:
+1. **Missing dependencies**: Added `@radix-ui/react-icons`, `autoprefixer`, `tailwindcss-animate`
+2. **Next.js 15 async params**: Updated dynamic routes to use `Promise<{ id: string }>`
+3. **Vercel environment variable formatting**: Supabase anon key had newline characters breaking HTTP headers - resolved by ensuring single-line format
+
+**Deployment URL**: https://www.trackstargame.com/
+
+**Vercel Preview URL**: https://trackstargame.vercel.app/
+
+**Repository**: https://github.com/Plabrum/trackstargame
+
+**Time to Complete**: ~2 hours (including troubleshooting)
+
+**Ready for Phase 2**: Database is ready, infrastructure is solid, all tooling configured. Next steps: Python scripts for data population.
+
+---
+
 ### Phase 2: Python Scripts & Data Population (Day 1, Afternoon)
 **Goal**: Scripts to scrape and populate database with Trackstar content
 
 6. Create Python environment setup:
-   - `scripts/requirements.txt` - Dependencies (requests, beautifulsoup4, psycopg2, etc.)
+   - `scripts/pyproject.toml` - UV dependencies (requests, beautifulsoup4, psycopg2, spotipy)
    - `scripts/.env.example` - Template for database connection
 7. Implement scraping scripts:
-   - `scripts/scrape_trackstar.py` - Scrape Trackstar videos/playlists
-   - Extract track metadata (title, artist, Spotify preview URL)
+   - `scripts/utils/youtube.py` - Extract YouTube video descriptions
+   - `scripts/utils/parser.py` - Parse track lists from descriptions
    - Handle rate limiting and error cases
-8. Implement database population scripts:
-   - `scripts/populate_packs.py` - Create themed packs in database
-   - `scripts/populate_tracks.py` - Insert tracks into packs
+8. Implement Spotify integration:
+   - `scripts/utils/spotify.py` - Spotify API wrapper for track search
+   - Get track metadata (title, artist, preview URL)
+9. Implement database population scripts:
+   - `scripts/create_pack_from_youtube.py` - End-to-end pack creation
+   - `scripts/list_packs.py` - View all packs in database
    - `scripts/utils/db.py` - Shared database connection utilities
-9. Create README documentation:
+10. Create README documentation:
    - `scripts/README.md` - Setup and usage instructions
    - How to run each script
    - Data format expectations
+
+#### Phase 2 Completion Report (November 14, 2025)
+
+**Status**: ✅ Scripts Complete - ⚠️ Spotify Preview URL Limitation Discovered
+
+**Deliverables**:
+- ✅ UV-based Python environment with pyproject.toml
+- ✅ YouTube description scraper (tested with Anderson .Paak episode)
+- ✅ Track list parser (successfully extracted 12 tracks)
+- ✅ Spotify API integration with spotipy
+- ✅ Database population utilities
+- ✅ End-to-end pack creation script
+- ✅ Comprehensive scripts/README.md documentation
+
+**Scripts Created**:
+```
+scripts/
+├── pyproject.toml                     # UV dependencies
+├── .env.example                       # Environment template
+├── .env                               # Local credentials (git-ignored)
+├── create_pack_from_youtube.py        # Main pack creation script
+├── list_packs.py                      # List all packs
+├── test_scraping.py                   # Test YouTube scraping
+├── test_spotify.py                    # Test Spotify API
+├── debug_spotify.py                   # Debug Spotify responses
+├── README.md                          # Full documentation
+└── utils/
+    ├── __init__.py
+    ├── youtube.py                     # YouTube scraping
+    ├── parser.py                      # Track list parsing
+    ├── spotify.py                     # Spotify API wrapper
+    └── db.py                          # Database utilities
+```
+
+**Testing Results**:
+- ✅ YouTube scraping: Successfully extracted Anderson .Paak episode description (1,292 chars)
+- ✅ Track parsing: Correctly identified all 12 tracks in format "Title - Artist"
+- ✅ Database connection: Validated with Supabase PostgreSQL
+- ⚠️ Spotify preview URLs: **NONE AVAILABLE** for tested tracks
+
+**Critical Issue Discovered - Spotify Preview URLs**:
+
+During testing, we discovered that Spotify API is **not providing preview URLs** (`preview_url: null`) for tracks, including very popular songs like:
+- "Blinding Lights" by The Weeknd
+- "Shape of You" by Ed Sheeran
+- All 12 tracks from Anderson .Paak episode
+
+**Why This Happens**:
+1. Preview URLs are not guaranteed by Spotify for all tracks
+2. May be region/market restricted
+3. Often missing for popular tracks or certain label agreements
+4. This is a known Spotify API limitation, not a bug in our code
+
+**Impact on MVP**:
+- Cannot use Spotify preview URLs as originally planned
+- Need alternative audio source strategy
+
+**Architecture Decision**:
+
+After discovering this limitation, we made a **critical architectural decision**:
+
+✅ **ADOPTED: Spotify Web Playback SDK**
+- Database schema updated to store `spotify_id` instead of `preview_url`
+- Host Spotify OAuth is now an **MVP requirement** (no longer Phase 2.5)
+- Hosts must authenticate with Spotify (free or premium account)
+- Can play full tracks, not just 30s previews
+- Better user experience overall
+- Migration applied: `20250114000001_update_tracks_spotify_id.sql`
+
+**Database Changes**:
+```sql
+-- Column renamed from preview_url to spotify_id
+ALTER TABLE tracks RENAME COLUMN preview_url TO spotify_id;
+CREATE INDEX idx_tracks_spotify_id ON tracks(spotify_id);
+```
+
+**Script Updates**:
+- ✅ `utils/spotify.py` - Returns `spotify_id` instead of checking for `preview_url`
+- ✅ `utils/db.py` - Stores `spotify_id` in database
+- ✅ `create_pack_from_youtube.py` - Updated messaging
+
+**Impact on Roadmap**:
+- Phase 2.5 (Spotify OAuth) is now part of MVP Phase 3
+- Players remain anonymous (no authentication required)
+- Only hosts need to authenticate with Spotify
+
+**Time to Complete**: ~3 hours (including troubleshooting and architecture pivot)
+
+**Ready for Phase 3**: Implement Spotify OAuth for hosts and Web Playback SDK integration
+
+---
 
 ### Phase 3: Game State & API (Day 1, Evening)
 **Goal**: Server-side game logic working

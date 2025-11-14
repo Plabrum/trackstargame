@@ -175,7 +175,7 @@ export type Database = {
           created_at: string | null
           id: string
           pack_id: string | null
-          preview_url: string
+          spotify_id: string
           title: string
         }
         Insert: {
@@ -183,7 +183,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           pack_id?: string | null
-          preview_url: string
+          spotify_id: string
           title: string
         }
         Update: {
@@ -191,7 +191,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           pack_id?: string | null
-          preview_url?: string
+          spotify_id?: string
           title?: string
         }
         Relationships: [
