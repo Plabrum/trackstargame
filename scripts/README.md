@@ -62,7 +62,25 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 
 ## Usage
 
-### Create a Pack from YouTube Video
+### Quick Start: Scrape All Track Star Videos
+
+The easiest way to populate your database is to scrape all videos from the Track Star YouTube channel:
+
+```bash
+# List all videos first (to see what's available)
+uv run python list_channel_videos.py
+
+# Scrape all videos and create packs (automatically skips existing)
+uv run python scrape_channel.py
+
+# Or process just the first 5 videos
+uv run python scrape_channel.py --limit 5
+
+# Force processing even for videos already in database
+uv run python scrape_channel.py --allow-duplicates
+```
+
+### Create a Pack from Single YouTube Video
 
 ```bash
 uv run python create_pack_from_youtube.py <youtube_url> [pack_name]
@@ -128,7 +146,9 @@ scripts/
 ├── pyproject.toml                     # UV dependencies
 ├── .env.example                       # Environment variables template
 ├── .env                               # Your credentials (git-ignored)
-├── create_pack_from_youtube.py        # Main script to create packs
+├── scrape_channel.py                  # ⭐ NEW: Scrape all videos from Track Star channel
+├── list_channel_videos.py             # ⭐ NEW: List all videos from channel
+├── create_pack_from_youtube.py        # Create pack from single YouTube video
 ├── list_packs.py                      # List all packs in database
 └── utils/
     ├── youtube.py                     # YouTube scraping utilities

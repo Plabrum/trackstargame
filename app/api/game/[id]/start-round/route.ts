@@ -3,7 +3,7 @@
  * POST /api/game/[id]/start-round
  *
  * Start a new round (host only).
- * Selects a random unused track from the pack and records start time.
+ * Retrieves the pre-shuffled track for the current round and records start time.
  *
  * Response:
  * {
@@ -42,36 +42,31 @@ export async function POST(
       );
     }
 
-    // Get tracks already used in this session
-    const { data: usedRounds } = await supabase
+    // Get the pre-created round for the current round number
+    const { data: round, error: roundError } = await supabase
       .from('game_rounds')
-      .select('track_id')
-      .eq('session_id', sessionId);
+      .select('track_id, tracks(id, title, artist, spotify_id)')
+      .eq('session_id', sessionId)
+      .eq('round_number', session.current_round)
+      .single();
 
-    const usedTrackIds = usedRounds?.map((r) => r.track_id) || [];
-
-    // Get a random unused track from the pack
-    let query = supabase
-      .from('tracks')
-      .select('id, title, artist, spotify_id')
-      .eq('pack_id', session.pack_id);
-
-    if (usedTrackIds.length > 0) {
-      query = query.not('id', 'in', `(${usedTrackIds.join(',')})`);
-    }
-
-    const { data: tracks, error: tracksError } = await query;
-
-    if (tracksError || !tracks || tracks.length === 0) {
-      console.error('Failed to fetch tracks:', tracksError);
+    if (roundError || !round) {
+      console.error('Failed to fetch round:', roundError);
       return NextResponse.json(
-        { error: 'No available tracks in pack' },
+        { error: 'Round not found' },
         { status: 404 }
       );
     }
 
-    // Select random track
-    const track = tracks[Math.floor(Math.random() * tracks.length)];
+    // Extract track from the joined query
+    const track = Array.isArray(round.tracks) ? round.tracks[0] : round.tracks;
+
+    if (!track) {
+      return NextResponse.json(
+        { error: 'Track not found for this round' },
+        { status: 404 }
+      );
+    }
 
     // Update session with round start time
     const roundStartTime = new Date().toISOString();
@@ -88,19 +83,6 @@ export async function POST(
         { error: 'Failed to start round' },
         { status: 500 }
       );
-    }
-
-    // Create round record (without buzzer yet)
-    const { error: roundError } = await supabase
-      .from('game_rounds')
-      .insert({
-        session_id: sessionId,
-        round_number: session.current_round,
-        track_id: track.id,
-      }) as { error: any };
-
-    if (roundError) {
-      console.error('Failed to create round:', roundError);
     }
 
     // Broadcast round start event

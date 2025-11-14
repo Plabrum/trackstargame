@@ -4,6 +4,7 @@
  *
  * Start the game (host only).
  * Requires at least 2 players.
+ * Shuffles all tracks from the pack and pre-creates all game rounds.
  *
  * Response:
  * {
@@ -27,7 +28,7 @@ export async function POST(
     // Get session and verify it's in lobby state
     const { data: session, error: sessionError } = await supabase
       .from('game_sessions')
-      .select('state, current_round')
+      .select('state, current_round, pack_id')
       .eq('id', sessionId)
       .single();
 
@@ -52,6 +53,46 @@ export async function POST(
       return NextResponse.json(
         { error: `Need ${isValidPlayerCount(count || 0) ? '' : 'between 2 and 10'} players to start` },
         { status: 400 }
+      );
+    }
+
+    // Fetch all tracks from the pack
+    const { data: tracks, error: tracksError } = await supabase
+      .from('tracks')
+      .select('id')
+      .eq('pack_id', session.pack_id);
+
+    if (tracksError || !tracks || tracks.length === 0) {
+      console.error('Failed to fetch tracks:', tracksError);
+      return NextResponse.json(
+        { error: 'No tracks found in pack' },
+        { status: 404 }
+      );
+    }
+
+    // Shuffle tracks using Fisher-Yates algorithm
+    const shuffledTracks = [...tracks];
+    for (let i = shuffledTracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledTracks[i], shuffledTracks[j]] = [shuffledTracks[j], shuffledTracks[i]];
+    }
+
+    // Create all game rounds upfront with shuffled order
+    const roundsToInsert = shuffledTracks.map((track, index) => ({
+      session_id: sessionId,
+      round_number: index + 1,
+      track_id: track.id,
+    }));
+
+    const { error: roundsError } = await supabase
+      .from('game_rounds')
+      .insert(roundsToInsert) as { error: any };
+
+    if (roundsError) {
+      console.error('Failed to create rounds:', roundsError);
+      return NextResponse.json(
+        { error: 'Failed to create game rounds' },
+        { status: 500 }
       );
     }
 
