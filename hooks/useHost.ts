@@ -222,7 +222,7 @@ export function useHost(
     startRound: useCallback(
       () => {
         if (!sessionId) throw new Error('No session ID');
-        return startRound.mutate(sessionId);
+        return startRound.mutateAsync(sessionId);
       },
       [sessionId, startRound]
     ),

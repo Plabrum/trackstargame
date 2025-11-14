@@ -2,42 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { usePacks } from "@/hooks/queries/use-packs";
-import { useCreateSession } from "@/hooks/mutations/use-game-mutations";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Music } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
-  const { data: packs, isLoading: isLoadingPacks } = usePacks();
-  const createSession = useCreateSession();
-
-  // Host game state
-  const [hostName, setHostName] = useState("");
-  const [selectedPackId, setSelectedPackId] = useState("");
-
-  // Join game state
   const [gameCode, setGameCode] = useState("");
 
-  const handleHostGame = async () => {
-    if (!hostName.trim() || !selectedPackId) {
-      return;
-    }
-
-    createSession.mutate(
-      { hostName: hostName.trim(), packId: selectedPackId },
-      {
-        onSuccess: (sessionId) => {
-          router.push(`/host/${sessionId}`);
-        },
-      }
-    );
+  const handleHostGame = () => {
+    // Redirect to Spotify OAuth
+    signIn("spotify", { callbackUrl: "/host/select-pack" });
   };
 
   const handleJoinGame = () => {
@@ -67,72 +46,29 @@ export default function Home() {
             <CardHeader>
               <CardTitle className="text-2xl">Host a Game</CardTitle>
               <CardDescription>
-                Create a new game session and invite players
+                Sign in with Spotify to create and host a game session
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Host name input */}
-              <div className="space-y-2">
-                <Label htmlFor="hostName">Your Name</Label>
-                <Input
-                  id="hostName"
-                  placeholder="Enter your name"
-                  value={hostName}
-                  onChange={(e) => setHostName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && hostName.trim() && selectedPackId) {
-                      handleHostGame();
-                    }
-                  }}
-                />
+              <div className="text-center space-y-3 py-4">
+                <Music className="h-16 w-16 mx-auto text-green-600" />
+                <p className="text-sm text-muted-foreground">
+                  Spotify account required for audio playback
+                </p>
               </div>
 
-              {/* Pack selector */}
-              <div className="space-y-2">
-                <Label htmlFor="pack">Select Track Pack</Label>
-                {isLoadingPacks ? (
-                  <Skeleton className="h-10 w-full" />
-                ) : packs && packs.length > 0 ? (
-                  <Select value={selectedPackId} onValueChange={setSelectedPackId}>
-                    <SelectTrigger id="pack">
-                      <SelectValue placeholder="Choose a music pack" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {packs.map((pack) => (
-                        <SelectItem key={pack.id} value={pack.id}>
-                          {pack.name}
-                          {pack.description && ` - ${pack.description}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Alert>
-                    <AlertDescription>
-                      No packs available. Please add tracks using the Python scripts.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              {/* Error display */}
-              {createSession.isError && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    {createSession.error?.message || "Failed to create session"}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Create button */}
               <Button
-                className="w-full"
+                className="w-full bg-green-600 hover:bg-green-700"
                 size="lg"
                 onClick={handleHostGame}
-                disabled={!hostName.trim() || !selectedPackId || createSession.isPending}
               >
-                {createSession.isPending ? "Creating..." : "Create Game"}
+                <Music className="h-5 w-5 mr-2" />
+                Sign in with Spotify
               </Button>
+
+              <div className="text-xs text-muted-foreground text-center mt-2">
+                Free or Premium account works. Premium recommended for best experience.
+              </div>
             </CardContent>
           </Card>
 

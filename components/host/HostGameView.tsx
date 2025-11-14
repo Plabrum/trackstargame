@@ -1,11 +1,14 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Play, Music } from "lucide-react";
+import { BuzzAnimation } from "@/components/game/BuzzAnimation";
+import { AnimatedScore } from "@/components/game/ScoreAnimation";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -47,8 +50,26 @@ export function HostGameView({
   // Sort players by score
   const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
 
+  // Buzz animation state
+  const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
+
+  // Trigger buzz animation when state changes to buzzed
+  useEffect(() => {
+    if (state === 'buzzed' && buzzerPlayer) {
+      setShowBuzzAnimation(true);
+    } else {
+      setShowBuzzAnimation(false);
+    }
+  }, [state, buzzerPlayer]);
+
   return (
     <div className="container mx-auto p-6 max-w-6xl space-y-6">
+      {/* Buzz Animation Overlay */}
+      <BuzzAnimation
+        show={showBuzzAnimation}
+        playerName={buzzerPlayer?.name}
+        isCorrect={null}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -222,7 +243,7 @@ export function HostGameView({
                       </span>
                     </div>
                     <span className={`font-bold ${index === 0 ? 'text-lg' : ''}`}>
-                      {player.score || 0}
+                      <AnimatedScore score={player.score || 0} />
                     </span>
                   </div>
                 ))}

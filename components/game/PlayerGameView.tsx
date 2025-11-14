@@ -1,10 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music, Zap } from "lucide-react";
+import { BuzzAnimation } from "./BuzzAnimation";
+import { AnimatedScore } from "./ScoreAnimation";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -42,14 +45,33 @@ export function PlayerGameView({
 
   const hasBuzzed = buzzerPlayer?.id === currentPlayerId;
 
+  // Buzz animation state
+  const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
+
+  // Trigger buzz animation when state changes to buzzed
+  useEffect(() => {
+    if (state === 'buzzed' && buzzerPlayer) {
+      setShowBuzzAnimation(true);
+    } else {
+      setShowBuzzAnimation(false);
+    }
+  }, [state, buzzerPlayer]);
+
   return (
     <div className="container mx-auto p-6 max-w-2xl space-y-6">
+      {/* Buzz Animation Overlay */}
+      <BuzzAnimation
+        show={showBuzzAnimation}
+        playerName={buzzerPlayer?.name}
+        isCorrect={null}
+      />
+
       {/* Header */}
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">Round {currentRound} / {totalRounds}</h1>
         <div className="flex items-center justify-center gap-4">
           <Badge variant="outline">
-            Your Score: {currentPlayer?.score || 0}
+            Your Score: <AnimatedScore score={currentPlayer?.score || 0} />
           </Badge>
           <Badge variant="secondary">
             Rank: #{currentPlayerRank}
@@ -191,7 +213,7 @@ export function PlayerGameView({
                     </div>
                   </div>
                   <span className={`font-bold ${isCurrentPlayer ? 'text-purple-600' : ''}`}>
-                    {player.score || 0}
+                    <AnimatedScore score={player.score || 0} />
                   </span>
                 </div>
               );

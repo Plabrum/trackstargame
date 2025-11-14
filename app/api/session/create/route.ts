@@ -2,11 +2,10 @@
 /**
  * POST /api/session/create
  *
- * Create a new game session.
+ * Create a new game session (requires Spotify authentication).
  *
  * Request body:
  * {
- *   hostName: string;
  *   packId: string;
  * }
  *
@@ -32,14 +31,17 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { hostName, packId } = body;
+    const { packId } = body;
 
-    if (!hostName || !packId) {
+    if (!packId) {
       return NextResponse.json(
-        { error: 'hostName and packId are required' },
+        { error: 'packId is required' },
         { status: 400 }
       );
     }
+
+    // Use authenticated user's name as host name
+    const hostName = session.user.name || session.user.email || 'Host';
 
     // Verify pack exists
     const supabase = await createClient();

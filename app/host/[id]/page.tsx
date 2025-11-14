@@ -2,14 +2,16 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import { SessionProvider } from "next-auth/react";
 import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
 import { useHost } from "@/hooks/useHost";
 import { HostLobby } from "@/components/host/HostLobby";
-import { HostGameView } from "@/components/host/HostGameView";
+import { HostGameController } from "@/components/host/HostGameController";
 import { FinalScore } from "@/components/game/FinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -20,6 +22,26 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   const { data: session, isLoading: isLoadingSession, error: sessionError } = useGameSession(id);
   const { data: players = [], isLoading: isLoadingPlayers } = useGamePlayers(id);
   const { data: rounds = [] } = useGameRounds(id);
+
+  // Get current round data (needed for track query)
+  const currentRound = session ? rounds.find((r) => r.round_number === session.current_round) : null;
+  const buzzerPlayer = currentRound?.buzzer_player_id
+    ? players.find((p) => p.id === currentRound.buzzer_player_id)
+    : null;
+
+  // Fetch track details for current round (must be before early returns)
+  const { data: currentTrack } = useQuery({
+    queryKey: ['tracks', currentRound?.track_id],
+    queryFn: async () => {
+      if (!currentRound?.track_id) return null;
+
+      const response = await fetch(`/api/tracks/${currentRound.track_id}`);
+      if (!response.ok) return null;
+
+      return response.json();
+    },
+    enabled: !!currentRound?.track_id && !!session && (session.state === 'playing' || session.state === 'buzzed' || session.state === 'reveal'),
+  });
 
   // Host controls
   const {
@@ -81,17 +103,6 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     );
   }
 
-  // Get current round data
-  const currentRound = rounds.find((r) => r.round_number === session.current_round);
-  const buzzerPlayer = currentRound?.buzzer_player_id
-    ? players.find((p) => p.id === currentRound.buzzer_player_id)
-    : null;
-
-  // Track info (would come from joining with tracks table in real implementation)
-  const currentTrack = session.state === 'reveal' || session.state === 'buzzed'
-    ? { title: "Track Title", artist: "Artist Name" } // Placeholder - would fetch from DB
-    : null;
-
   // Render appropriate view based on game state
   if (session.state === 'finished') {
     return (
@@ -116,19 +127,23 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   }
 
   return (
-    <HostGameView
-      session={session}
-      players={players}
-      currentTrack={currentTrack}
-      buzzerPlayer={buzzerPlayer}
-      elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
-      onStartRound={startRound}
-      onJudgeCorrect={() => judgeAnswer(true)}
-      onJudgeIncorrect={() => judgeAnswer(false)}
-      onNextRound={nextRound}
-      isStartingRound={isStartingRound}
-      isJudging={isJudging}
-      isAdvancing={isAdvancing}
-    />
+    <SessionProvider>
+      <HostGameController
+        session={session}
+        players={players}
+        currentTrack={currentTrack}
+        buzzerPlayer={buzzerPlayer}
+        elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
+        onStartRound={async () => {
+          await startRound();
+        }}
+        onJudgeCorrect={() => judgeAnswer(true)}
+        onJudgeIncorrect={() => judgeAnswer(false)}
+        onNextRound={nextRound}
+        isStartingRound={isStartingRound}
+        isJudging={isJudging}
+        isAdvancing={isAdvancing}
+      />
+    </SessionProvider>
   );
 }
