@@ -6,7 +6,7 @@
 
 import { useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getGameChannelName, type GameEvent } from '@/lib/game/realtime';
+import { getGameChannelName, type GameEvent } from '@/lib/game/realtime-types';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type GameEventHandlers = {

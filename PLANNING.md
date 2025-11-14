@@ -832,7 +832,7 @@ The realtime infrastructure is now complete. All host and player views can use `
     - Immediate stop on buzz event
     - Error handling for failed loads
 23. Add UI polish with Shadcn components:
-    - Buzz animation (screen flash, confetti for correct answer)
+    - Buzz animation (screen flash for correct answer)
     - Score update animations (smooth increment/decrement)
     - Loading states (Shadcn Skeleton components)
     - Toast notifications for errors (Shadcn Toast)

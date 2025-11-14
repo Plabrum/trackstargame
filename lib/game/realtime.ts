@@ -1,81 +1,17 @@
 /**
- * Supabase Realtime broadcasting utilities.
+ * Supabase Realtime broadcasting utilities (server-side only).
  *
  * Handles broadcasting game events to all connected clients.
+ * This module should only be imported in API routes or server components.
  */
 
 import { createClient } from '@/lib/supabase/server';
+import type { GameEvent } from './realtime-types';
+import { getGameChannelName } from './realtime-types';
 
-/**
- * Get the channel name for a game session.
- */
-export function getGameChannelName(sessionId: string): string {
-  return `game:${sessionId}`;
-}
-
-// Event types that can be broadcast
-export type GameEvent =
-  | {
-      type: 'player_joined';
-      playerId: string;
-      playerName: string;
-    }
-  | {
-      type: 'player_left';
-      playerId: string;
-      playerName: string;
-    }
-  | {
-      type: 'game_started';
-      roundNumber: number;
-    }
-  | {
-      type: 'round_start';
-      roundNumber: number;
-      trackId: string;
-    }
-  | {
-      type: 'buzz';
-      playerId: string;
-      playerName: string;
-      elapsedSeconds: number;
-    }
-  | {
-      type: 'round_result';
-      playerId: string;
-      correct: boolean;
-      pointsAwarded: number;
-    }
-  | {
-      type: 'reveal';
-      track: {
-        title: string;
-        artist: string;
-        spotify_id: string;
-      };
-      leaderboard: Array<{
-        playerId: string;
-        playerName: string;
-        score: number;
-      }>;
-    }
-  | {
-      type: 'state_change';
-      newState: string;
-    }
-  | {
-      type: 'game_end';
-      leaderboard: Array<{
-        playerId: string;
-        playerName: string;
-        score: number;
-      }>;
-      winner: {
-        playerId: string;
-        playerName: string;
-        score: number;
-      };
-    };
+// Re-export types and helpers for convenience
+export type { GameEvent };
+export { getGameChannelName };
 
 /**
  * Broadcast an event to all clients subscribed to a game session.
