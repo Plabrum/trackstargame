@@ -192,7 +192,7 @@ export class SpotifyPlayer {
         uri: currentTrack.uri,
         id: currentTrack.id,
         name: currentTrack.name,
-        artists: currentTrack.artists.map(a => a.name).join(', '),
+        artists: currentTrack.artists.map((a: { name: string }) => a.name).join(', '),
         albumName: currentTrack.album.name,
         albumArt: currentTrack.album.images[0]?.url || null, // Largest image first
       };

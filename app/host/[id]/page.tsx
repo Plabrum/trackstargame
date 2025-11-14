@@ -157,7 +157,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       <FinalScore
         players={players}
         rounds={rounds}
-        onPlayAgain={() => router.push("/")}
+        onPlayAgain={() => router.push("/host/select-pack")}
       />
     );
   }
