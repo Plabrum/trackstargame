@@ -1,0 +1,25 @@
+# Rolling Stone's Greatest Songs of All Time (Top 100)
+# Format: Song Title - Artist Name
+# Source: https://www.rollingstone.com/music/music-lists/best-songs-of-all-time-1224767/
+
+Like a Rolling Stone - Bob Dylan
+Respect - Aretha Franklin
+Imagine - John Lennon
+What's Going On - Marvin Gaye
+(I Can't Get No) Satisfaction - The Rolling Stones
+God Only Knows - The Beach Boys
+A Change Is Gonna Come - Sam Cooke
+Smells Like Teen Spirit - Nirvana
+Strawberry Fields Forever - The Beatles
+Hey Jude - The Beatles
+Purple Haze - Jimi Hendrix
+London Calling - The Clash
+I Want to Hold Your Hand - The Beatles
+Gimme Shelter - The Rolling Stones
+Superstition - Stevie Wonder
+Bohemian Rhapsody - Queen
+Billie Jean - Michael Jackson
+The Times They Are A-Changin' - Bob Dylan
+Born to Run - Bruce Springsteen
+Be My Baby - The Ronettes
+In My Life - The Beatles

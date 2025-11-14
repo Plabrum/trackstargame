@@ -182,7 +182,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       buzzerPlayer={buzzerPlayer}
       elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
       onStartRound={async () => {
-        await startRound();
+        return await startRound();
       }}
       onJudgeCorrect={() => {
         judgeAnswer(true);

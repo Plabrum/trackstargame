@@ -1,0 +1,100 @@
+# Rolling Stone's Greatest Songs of All Time (Top 100)
+# Format: Song Title - Artist Name
+# Source: https://www.rollingstone.com/music/music-lists/best-songs-of-all-time-1224767/
+
+Like a Rolling Stone - Bob Dylan
+Respect - Aretha Franklin
+Imagine - John Lennon
+What's Going On - Marvin Gaye
+(I Can't Get No) Satisfaction - The Rolling Stones
+God Only Knows - The Beach Boys
+A Change Is Gonna Come - Sam Cooke
+Smells Like Teen Spirit - Nirvana
+Strawberry Fields Forever - The Beatles
+Hey Jude - The Beatles
+Purple Haze - Jimi Hendrix
+London Calling - The Clash
+I Want to Hold Your Hand - The Beatles
+Gimme Shelter - The Rolling Stones
+Superstition - Stevie Wonder
+Bohemian Rhapsody - Queen
+Billie Jean - Michael Jackson
+The Times They Are A-Changin' - Bob Dylan
+Born to Run - Bruce Springsteen
+Be My Baby - The Ronettes
+In My Life - The Beatles
+People Get Ready - The Impressions
+God Save the Queen - Sex Pistols
+A Day in the Life - The Beatles
+Dancing in the Street - Martha and the Vandellas
+Blowin' in the Wind - Bob Dylan
+Good Vibrations - The Beach Boys
+Waterloo Sunset - The Kinks
+Let's Stay Together - Al Green
+Hotel California - Eagles
+Redemption Song - Bob Marley and the Wailers
+I Walk the Line - Johnny Cash
+Hound Dog - Elvis Presley
+Dancing Queen - ABBA
+Lose Yourself - Eminem
+Dreams - Fleetwood Mac
+Stairway to Heaven - Led Zeppelin
+When Doves Cry - Prince
+Sweet Child O' Mine - Guns N' Roses
+I Heard It Through the Grapevine - Marvin Gaye
+Light My Fire - The Doors
+Stayin' Alive - Bee Gees
+Suspicious Minds - Elvis Presley
+Rocket Man - Elton John
+Don't Stop Believin' - Journey
+What'd I Say - Ray Charles
+You've Lost That Lovin' Feelin' - The Righteous Brothers
+Message in a Bottle - The Police
+Your Song - Elton John
+Jolene - Dolly Parton
+Nuthin' but a 'G' Thang - Dr. Dre
+The Weight - The Band
+Midnight Train to Georgia - Gladys Knight & the Pips
+California Dreamin' - The Mamas & the Papas
+Tangled Up in Blue - Bob Dylan
+Crossroads - Cream
+Proud Mary - Creedence Clearwater Revival
+Fortunate Son - Creedence Clearwater Revival
+Bridge Over Troubled Water - Simon & Garfunkel
+All Along the Watchtower - Jimi Hendrix
+Sexual Healing - Marvin Gaye
+Please Please Me - The Beatles
+Hallelujah - Leonard Cohen
+I Never Loved a Man (The Way I Love You) - Aretha Franklin
+No Woman, No Cry - Bob Marley & The Wailers
+Kashmir - Led Zeppelin
+Layla - Derek and the Dominos
+The Message - Grandmaster Flash and the Furious Five
+Fight the Power - Public Enemy
+Rhiannon - Fleetwood Mac
+Come Together - The Beatles
+Stand by Me - Ben E. King
+My Girl - The Temptations
+Riders on the Storm - The Doors
+Sunshine of Your Love - Cream
+Georgia on My Mind - Ray Charles
+Crazy - Patsy Cline
+Walk On By - Dionne Warwick
+Maybellene - Chuck Berry
+Brown Eyed Girl - Van Morrison
+Rock Around the Clock - Bill Haley & His Comets
+Heart of Glass - Blondie
+Fast Car - Tracy Chapman
+Blue Monday - New Order
+When a Man Loves a Woman - Percy Sledge
+Tutti Frutti - Little Richard
+God Only Knows - The Beach Boys
+Every Breath You Take - The Police
+River Deep - Mountain High - Ike & Tina Turner
+Mr. Tambourine Man - The Byrds
+Sympathy for the Devil - The Rolling Stones
+Johnny B. Goode - Chuck Berry
+Everyday People - Sly and the Family Stone
+What's Love Got to Do with It - Tina Turner
+Papa Was a Rollin' Stone - The Temptations
+Ring of Fire - Johnny Cash
