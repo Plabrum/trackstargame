@@ -8,12 +8,9 @@ export type ErrorType<Error> = Error;
 
 export const customFetch = <T>(
   url: string,
-  options: RequestInit | AbortSignal = {}
+  options: RequestInit = {}
 ): Promise<T> => {
-  // Handle when options is an AbortSignal (from react-query)
-  const requestInit: RequestInit = options instanceof AbortSignal
-    ? { signal: options }
-    : options;
+  const requestInit: RequestInit = options;
   // In browser, use relative URLs
   // In Expo, use full API URL from env
   const baseURL =
