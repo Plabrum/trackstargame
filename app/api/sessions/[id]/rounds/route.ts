@@ -7,6 +7,9 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getNextGameState, enforceNextRoundRules, StateTransitionError, GameRuleError } from '@/lib/api/state-machine-middleware';
+import { broadcastStateChange } from '@/lib/game/realtime';
+import { validateGameState, GAME_CONFIG } from '@/lib/game/state-machine';
 
 /**
  * GET /api/sessions/[id]/rounds
@@ -57,7 +60,7 @@ export async function POST(
     // Get current session state
     const { data: session, error: sessionError } = await supabase
       .from('game_sessions')
-      .select('current_round, pack_id')
+      .select('current_round, pack_id, state')
       .eq('id', sessionId)
       .single();
 
@@ -68,25 +71,44 @@ export async function POST(
       );
     }
 
+    const currentState = validateGameState(session.state);
     const nextRound = (session.current_round || 0) + 1;
 
-    // Check if game should end (10 rounds total)
-    if (nextRound > 10) {
-      const { data: updatedSession, error: updateError } = await supabase
-        .from('game_sessions')
-        .update({ state: 'finished' })
-        .eq('id', sessionId)
-        .select()
-        .single();
+    try {
+      // Enforce game rules
+      enforceNextRoundRules(session, nextRound);
 
-      if (updateError) {
-        return NextResponse.json(
-          { error: updateError.message },
-          { status: 500 }
-        );
+      // Get next state through state machine
+      const nextState = getNextGameState(currentState, 'next_round', {
+        currentRound: session.current_round || 0,
+        nextRound,
+      });
+
+      // If next state is finished, update and return
+      if (nextState === 'finished') {
+        const { data: updatedSession, error: updateError } = await supabase
+          .from('game_sessions')
+          .update({ state: nextState })
+          .eq('id', sessionId)
+          .select()
+          .single();
+
+        if (updateError) {
+          return NextResponse.json(
+            { error: updateError.message },
+            { status: 500 }
+          );
+        }
+
+        await broadcastStateChange(sessionId, nextState);
+
+        return NextResponse.json(updatedSession);
       }
-
-      return NextResponse.json(updatedSession);
+    } catch (error) {
+      if (error instanceof StateTransitionError || error instanceof GameRuleError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
     }
 
     // Get random track from pack for next round
@@ -170,6 +192,9 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    // Broadcast state change to ready
+    await broadcastStateChange(sessionId, 'ready');
 
     return NextResponse.json(updatedSession);
   } catch (error) {

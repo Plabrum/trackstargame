@@ -7,10 +7,13 @@
 export type ErrorType<Error> = Error;
 
 export const customFetch = <T>(
-  config: RequestInit & { url: string }
+  url: string,
+  options: RequestInit | AbortSignal = {}
 ): Promise<T> => {
-  const { url, ...rest } = config;
-
+  // Handle when options is an AbortSignal (from react-query)
+  const requestInit: RequestInit = options instanceof AbortSignal
+    ? { signal: options }
+    : options;
   // In browser, use relative URLs
   // In Expo, use full API URL from env
   const baseURL =
@@ -19,10 +22,10 @@ export const customFetch = <T>(
       : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   return fetch(`${baseURL}${url}`, {
-    ...rest,
+    ...requestInit,
     headers: {
       'Content-Type': 'application/json',
-      ...rest.headers,
+      ...requestInit.headers,
     },
   }).then(async (response) => {
     if (!response.ok) {

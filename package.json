@@ -37,10 +37,10 @@
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.23.8"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@anatine/zod-openapi": "^2.2.8",
+    "@asteasolutions/zod-to-openapi": "^8.1.0",
     "@types/node": "^20",
     "@types/qrcode.react": "^3.0.0",
     "@types/react": "^19",

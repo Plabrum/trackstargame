@@ -8,6 +8,9 @@ import { createClient } from '@/lib/supabase/server';
 import { apiHandler, ApiErrors, parseBody } from '@/lib/api/route-handler';
 import { BuzzSchema } from '@/lib/api/schemas';
 import type { RoundsAPI } from '@/lib/api/types';
+import { getNextGameState, enforceBuzzRules, StateTransitionError, GameRuleError } from '@/lib/api/state-machine-middleware';
+import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
+import { validateGameState } from '@/lib/game/state-machine';
 
 type RouteParams = { id: string };
 
@@ -35,9 +38,16 @@ export const POST = apiHandler<RoundsAPI.BuzzResponse, RouteParams>(
       throw ApiErrors.notFound('Session');
     }
 
-    // Validate game state
-    if (session.state !== 'playing') {
-      throw ApiErrors.badRequest('Cannot buzz when game is not playing');
+    const currentState = validateGameState(session.state);
+
+    try {
+      // Enforce game rules using state machine
+      enforceBuzzRules(session);
+    } catch (error) {
+      if (error instanceof GameRuleError) {
+        throw ApiErrors.badRequest(error.message);
+      }
+      throw error;
     }
 
     if (!session.round_start_time) {
@@ -61,6 +71,13 @@ export const POST = apiHandler<RoundsAPI.BuzzResponse, RouteParams>(
       throw ApiErrors.badRequest('Someone already buzzed');
     }
 
+    // Get player name for broadcast
+    const { data: player } = await supabase
+      .from('players')
+      .select('name')
+      .eq('id', playerId)
+      .single();
+
     // Calculate elapsed time
     const elapsedMs = Date.now() - new Date(session.round_start_time).getTime();
     const elapsedSeconds = elapsedMs / 1000;
@@ -82,11 +99,31 @@ export const POST = apiHandler<RoundsAPI.BuzzResponse, RouteParams>(
       throw ApiErrors.internal(updateError.message);
     }
 
-    // Update session state to buzzed
-    await supabase
-      .from('game_sessions')
-      .update({ state: 'buzzed' })
-      .eq('id', sessionId);
+    // Get next state through state machine
+    try {
+      const nextState = getNextGameState(currentState, 'buzz');
+
+      // Update session state to buzzed
+      await supabase
+        .from('game_sessions')
+        .update({ state: nextState })
+        .eq('id', sessionId);
+
+      // Broadcast buzz event
+      await broadcastGameEvent(sessionId, {
+        type: 'buzz',
+        playerId,
+        playerName: player?.name || 'Unknown',
+        elapsedSeconds,
+      });
+
+      await broadcastStateChange(sessionId, nextState);
+    } catch (error) {
+      if (error instanceof StateTransitionError) {
+        throw ApiErrors.badRequest(error.message);
+      }
+      throw error;
+    }
 
     return updatedRound;
   }

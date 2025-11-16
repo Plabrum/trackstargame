@@ -7,12 +7,9 @@
  * - Validation testing
  */
 
-import { extendZodWithOpenApi, OpenApiGeneratorV3, OpenAPIRegistry } from '@anatine/zod-openapi';
-import { z } from 'zod';
+import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
+import { z } from './zod-openapi';
 import * as schemas from './schemas';
-
-// Extend Zod with OpenAPI metadata
-extendZodWithOpenApi(z);
 
 const registry = new OpenAPIRegistry();
 
@@ -74,7 +71,7 @@ registry.registerPath({
       id: z.string().uuid(),
     }),
     query: z.object({
-      include: z.string().optional().describe('Comma-separated: players,rounds,pack'),
+      include: z.string().optional(),
     }),
   },
   responses: {

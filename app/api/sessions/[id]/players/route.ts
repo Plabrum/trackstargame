@@ -10,6 +10,7 @@ import { apiHandler, ApiErrors, parseBody, parseQuery } from '@/lib/api/route-ha
 import { JoinSessionSchema, PlayerSortSchema, OrderSchema } from '@/lib/api/schemas';
 import type { PlayersAPI } from '@/lib/api/types';
 import { z } from 'zod';
+import { broadcastGameEvent } from '@/lib/game/realtime';
 
 type RouteParams = { id: string };
 
@@ -86,6 +87,13 @@ export const POST = apiHandler<PlayersAPI.JoinResponse, RouteParams>(async (requ
     console.error('Failed to create player:', playerError);
     throw ApiErrors.internal('Failed to join session');
   }
+
+  // Broadcast player joined event
+  await broadcastGameEvent(sessionId, {
+    type: 'player_joined',
+    playerId: player.id,
+    playerName: player.name,
+  });
 
   return player;
 });

@@ -10,9 +10,7 @@ import { defineConfig } from 'orval';
 export default defineConfig({
   trackstar: {
     input: {
-      target: './lib/api/openapi.ts',
-      // Alternatively, use the served endpoint:
-      // target: 'http://localhost:3000/api/openapi',
+      target: './lib/api/openapi.json',
     },
     output: {
       mode: 'tags-split',
@@ -21,6 +19,9 @@ export default defineConfig({
       client: 'react-query',
       mock: false,
       override: {
+        query: {
+          signal: true,
+        },
         mutator: {
           path: './lib/api/mutator.ts',
           name: 'customFetch',

@@ -7,6 +7,9 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getNextGameState, enforceRoundStartRules, enforceJudgeRules, StateTransitionError, GameRuleError } from '@/lib/api/state-machine-middleware';
+import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
+import { validateGameState, calculatePoints } from '@/lib/game/state-machine';
 
 /**
  * GET /api/sessions/[id]/rounds/current
@@ -94,32 +97,67 @@ export async function PATCH(
       );
     }
 
+    const currentState = validateGameState(session.state);
+
     switch (action) {
       case 'start': {
-        // Start the current round
-        const { error: updateError } = await supabase
-          .from('game_sessions')
-          .update({
-            round_start_time: new Date().toISOString(),
-            state: 'playing',
-          })
-          .eq('id', sessionId);
+        try {
+          // Enforce game rules
+          enforceRoundStartRules(session);
 
-        if (updateError) {
-          return NextResponse.json(
-            { error: updateError.message },
-            { status: 500 }
-          );
+          // Get next state through state machine
+          const nextState = getNextGameState(currentState, 'start_round');
+
+          // Get current round to get track ID
+          const currentRoundNum = session.current_round || 0;
+          const { data: round } = await supabase
+            .from('game_rounds')
+            .select('track_id')
+            .eq('session_id', sessionId)
+            .eq('round_number', currentRoundNum)
+            .single();
+
+          // Start the current round
+          const { error: updateError } = await supabase
+            .from('game_sessions')
+            .update({
+              round_start_time: new Date().toISOString(),
+              state: nextState,
+            })
+            .eq('id', sessionId);
+
+          if (updateError) {
+            return NextResponse.json(
+              { error: updateError.message },
+              { status: 500 }
+            );
+          }
+
+          // Broadcast round start event
+          if (round?.track_id) {
+            await broadcastGameEvent(sessionId, {
+              type: 'round_start',
+              roundNumber: currentRoundNum,
+              trackId: round.track_id,
+            });
+          }
+
+          await broadcastStateChange(sessionId, nextState);
+
+          // Return updated session
+          const { data: updatedSession } = await supabase
+            .from('game_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+
+          return NextResponse.json(updatedSession);
+        } catch (error) {
+          if (error instanceof StateTransitionError || error instanceof GameRuleError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+          }
+          throw error;
         }
-
-        // Return updated session
-        const { data: updatedSession } = await supabase
-          .from('game_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
-
-        return NextResponse.json(updatedSession);
       }
 
       case 'judge': {
@@ -132,40 +170,41 @@ export async function PATCH(
           );
         }
 
-        // Get current round
-        const judgeRoundNum = session.current_round || 0;
-        const { data: round, error: roundError } = await supabase
-          .from('game_rounds')
-          .select('buzzer_player_id, elapsed_seconds')
-          .eq('session_id', sessionId)
-          .eq('round_number', judgeRoundNum)
-          .single();
+        try {
+          // Enforce game rules
+          enforceJudgeRules(session);
 
-        if (roundError || !round || !round.buzzer_player_id) {
-          return NextResponse.json(
-            { error: 'No buzzer to judge' },
-            { status: 400 }
-          );
-        }
+          // Get current round
+          const judgeRoundNum = session.current_round || 0;
+          const { data: round, error: roundError } = await supabase
+            .from('game_rounds')
+            .select('buzzer_player_id, elapsed_seconds')
+            .eq('session_id', sessionId)
+            .eq('round_number', judgeRoundNum)
+            .single();
 
-        // Calculate points (100 base, -10 per second elapsed, min 10)
-        const elapsedSeconds = Number(round.elapsed_seconds) || 0;
-        const pointsAwarded = correct
-          ? Math.max(10, 100 - Math.floor(elapsedSeconds) * 10)
-          : 0;
+          if (roundError || !round || !round.buzzer_player_id) {
+            return NextResponse.json(
+              { error: 'No buzzer to judge' },
+              { status: 400 }
+            );
+          }
 
-        // Update round with judgement
-        await supabase
-          .from('game_rounds')
-          .update({
-            was_correct: correct,
-            points_awarded: pointsAwarded,
-          })
-          .eq('session_id', sessionId)
-          .eq('round_number', judgeRoundNum);
+          // Calculate points using state machine formula (30 max, -10 penalty)
+          const elapsedSeconds = Number(round.elapsed_seconds) || 0;
+          const pointsAwarded = calculatePoints(elapsedSeconds, correct);
 
-        // Update player score if correct
-        if (correct) {
+          // Update round with judgement (fixed field name: correct not was_correct)
+          await supabase
+            .from('game_rounds')
+            .update({
+              correct: correct,
+              points_awarded: pointsAwarded,
+            })
+            .eq('session_id', sessionId)
+            .eq('round_number', judgeRoundNum);
+
+          // Update player score (works for both correct and incorrect due to penalty)
           const { data: player } = await supabase
             .from('players')
             .select('score')
@@ -180,39 +219,104 @@ export async function PATCH(
               })
               .eq('id', round.buzzer_player_id);
           }
+
+          // Get next state through state machine
+          const nextState = getNextGameState(currentState, 'judge');
+
+          // Update session state to reveal
+          await supabase
+            .from('game_sessions')
+            .update({ state: nextState })
+            .eq('id', sessionId);
+
+          // Broadcast round result event
+          await broadcastGameEvent(sessionId, {
+            type: 'round_result',
+            playerId: round.buzzer_player_id,
+            correct,
+            pointsAwarded,
+          });
+
+          await broadcastStateChange(sessionId, nextState);
+
+          // Return updated round
+          const { data: updatedRound } = await supabase
+            .from('game_rounds')
+            .select('*')
+            .eq('session_id', sessionId)
+            .eq('round_number', judgeRoundNum)
+            .single();
+
+          return NextResponse.json(updatedRound);
+        } catch (error) {
+          if (error instanceof StateTransitionError || error instanceof GameRuleError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+          }
+          throw error;
         }
-
-        // Update session state to reveal
-        await supabase
-          .from('game_sessions')
-          .update({ state: 'reveal' })
-          .eq('id', sessionId);
-
-        // Return updated round
-        const { data: updatedRound } = await supabase
-          .from('game_rounds')
-          .select('*')
-          .eq('session_id', sessionId)
-          .eq('round_number', judgeRoundNum)
-          .single();
-
-        return NextResponse.json(updatedRound);
       }
 
       case 'reveal': {
-        // Reveal track (no buzzer)
-        await supabase
-          .from('game_sessions')
-          .update({ state: 'reveal' })
-          .eq('id', sessionId);
+        try {
+          // Reveal track (timeout case - no buzzer)
+          const nextState = getNextGameState(currentState, 'judge');
 
-        const { data: updatedSession } = await supabase
-          .from('game_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single();
+          // Get current round and track info
+          const currentRoundNum = session.current_round || 0;
+          const { data: round } = await supabase
+            .from('game_rounds')
+            .select('track_id, tracks(title, artist, spotify_id)')
+            .eq('session_id', sessionId)
+            .eq('round_number', currentRoundNum)
+            .single();
 
-        return NextResponse.json(updatedSession);
+          // Get leaderboard
+          const { data: players } = await supabase
+            .from('players')
+            .select('id, name, score')
+            .eq('session_id', sessionId)
+            .order('score', { ascending: false });
+
+          await supabase
+            .from('game_sessions')
+            .update({ state: nextState })
+            .eq('id', sessionId);
+
+          // Broadcast reveal event with track info
+          const track = round?.tracks as any;
+          if (track) {
+            const leaderboard = (players || []).map(p => ({
+              playerId: p.id,
+              playerName: p.name,
+              score: p.score || 0,
+            }));
+
+            await broadcastGameEvent(sessionId, {
+              type: 'reveal',
+              track: {
+                title: track.title,
+                artist: track.artist,
+                spotify_id: track.spotify_id,
+              },
+              leaderboard,
+            });
+          }
+
+          await broadcastStateChange(sessionId, nextState);
+
+          const { data: updatedSession } = await supabase
+            .from('game_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+
+          return NextResponse.json(updatedSession);
+        } catch (error) {
+          if (error instanceof StateTransitionError || error instanceof GameRuleError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+          }
+          throw error;
+        }
       }
 
       default:
