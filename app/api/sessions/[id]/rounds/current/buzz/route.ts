@@ -4,31 +4,23 @@
  * POST /api/sessions/[id]/rounds/current/buzz - Player buzzes in
  */
 
-import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiHandler, ApiErrors, parseBody } from '@/lib/api/route-handler';
+import { BuzzSchema } from '@/lib/api/schemas';
+import type { RoundsAPI } from '@/lib/api/types';
+
+type RouteParams = { id: string };
 
 /**
  * POST /api/sessions/[id]/rounds/current/buzz
  * Player buzzes in during current round
- *
- * Request: { playerId: string }
- * Response: Updated round with buzzer info
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
+export const POST = apiHandler<RoundsAPI.BuzzResponse, RouteParams>(
+  async (request, { params }) => {
     const { id: sessionId } = await params;
-    const body = await request.json();
-    const { playerId } = body;
 
-    if (!playerId) {
-      return NextResponse.json(
-        { error: 'playerId is required' },
-        { status: 400 }
-      );
-    }
+    // ✅ Validated! playerId is guaranteed to be a valid UUID
+    const { playerId } = await parseBody(request, BuzzSchema);
 
     const supabase = await createClient();
 
@@ -40,25 +32,16 @@ export async function POST(
       .single();
 
     if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Session not found' },
-        { status: 404 }
-      );
+      throw ApiErrors.notFound('Session');
     }
 
     // Validate game state
     if (session.state !== 'playing') {
-      return NextResponse.json(
-        { error: 'Cannot buzz when game is not playing' },
-        { status: 400 }
-      );
+      throw ApiErrors.badRequest('Cannot buzz when game is not playing');
     }
 
     if (!session.round_start_time) {
-      return NextResponse.json(
-        { error: 'Round has not started yet' },
-        { status: 400 }
-      );
+      throw ApiErrors.badRequest('Round has not started yet');
     }
 
     // Get current round to check if someone already buzzed
@@ -71,17 +54,11 @@ export async function POST(
       .single();
 
     if (roundError) {
-      return NextResponse.json(
-        { error: 'Round not found' },
-        { status: 404 }
-      );
+      throw ApiErrors.notFound('Round');
     }
 
     if (currentRound.buzzer_player_id) {
-      return NextResponse.json(
-        { error: 'Someone already buzzed' },
-        { status: 400 }
-      );
+      throw ApiErrors.badRequest('Someone already buzzed');
     }
 
     // Calculate elapsed time
@@ -102,10 +79,7 @@ export async function POST(
       .single();
 
     if (updateError) {
-      return NextResponse.json(
-        { error: updateError.message },
-        { status: 500 }
-      );
+      throw ApiErrors.internal(updateError.message);
     }
 
     // Update session state to buzzed
@@ -114,12 +88,6 @@ export async function POST(
       .update({ state: 'buzzed' })
       .eq('id', sessionId);
 
-    return NextResponse.json(updatedRound);
-  } catch (error) {
-    console.error('Error in POST /api/sessions/[id]/rounds/current/buzz:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return updatedRound;
   }
-}
+);
