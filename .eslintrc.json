@@ -1,3 +1,4 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": ["lib/api/model/**", "lib/api/sessions/**", "lib/api/players/**", "lib/api/rounds/**", "lib/api/packs/**"]
 }
