@@ -8,6 +8,7 @@
 
 import { createContext, useContext, useCallback } from 'react';
 import { clearSpotifyAuth } from './spotify-auth-actions';
+import { toast } from '@/hooks/use-toast';
 
 export interface SpotifyUser {
   display_name: string;
@@ -67,12 +68,22 @@ export function SpotifyAuthProvider({
     try {
       // Clear server-side cookies
       await clearSpotifyAuth();
-
-      // Redirect to home page
-      window.location.href = '/';
     } catch (error) {
       console.error('[SpotifyAuth] Logout failed:', error);
+
+      // Show error toast to user
+      toast({
+        title: 'Logout failed',
+        description: 'Failed to clear your session. Please try again.',
+        variant: 'destructive',
+      });
+
+      // Don't redirect if logout failed
+      return;
     }
+
+    // Only redirect if logout succeeded
+    window.location.href = '/';
   }, []);
 
   const value: SpotifyAuthState = {

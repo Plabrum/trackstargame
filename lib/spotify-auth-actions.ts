@@ -16,7 +16,23 @@ export interface SpotifyUser {
 }
 
 /**
- * Check if a JWT token is expired by decoding it
+ * Refresh buffer to avoid edge cases where token expires during request
+ * Tokens will be refreshed 5 minutes before actual expiration
+ */
+const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * In-flight refresh promise to prevent race conditions
+ * If multiple requests try to refresh simultaneously, they'll reuse this promise
+ */
+let refreshPromise: Promise<{
+  success: boolean;
+  accessToken?: string;
+  error?: string;
+}> | null = null;
+
+/**
+ * Check if a JWT token is expired (or close to expiring) by decoding it
  * Spotify access tokens are JWTs with standard expiration claims
  */
 function isTokenExpired(token: string): boolean {
@@ -38,10 +54,12 @@ function isTokenExpired(token: string): boolean {
     // Check if token has expired (exp is in seconds, Date.now() is in ms)
     if (!payload.exp) return true;
 
-    const isExpired = payload.exp * 1000 < Date.now();
+    // Refresh slightly before actual expiration to avoid edge cases
+    const isExpired = payload.exp * 1000 - REFRESH_BUFFER_MS < Date.now();
     console.log('[isTokenExpired]', {
       exp: new Date(payload.exp * 1000).toISOString(),
       now: new Date().toISOString(),
+      bufferMinutes: REFRESH_BUFFER_MS / 60000,
       isExpired,
     });
 
@@ -171,43 +189,58 @@ async function fetchSpotifyUser(accessToken: string): Promise<{
 
 /**
  * Refresh the access token using the refresh token
+ * Deduplicates concurrent refresh requests to prevent race conditions
  */
 async function refreshAccessToken(refreshToken: string): Promise<{
   success: boolean;
   accessToken?: string;
   error?: string;
 }> {
-  try {
-    console.log('[refreshAccessToken] Attempting to refresh token...');
-    const tokens = await refreshSpotifyToken(refreshToken);
+  // Reuse in-flight refresh request if one exists
+  if (refreshPromise) {
+    console.log('[refreshAccessToken] Reusing in-flight refresh request');
+    return refreshPromise;
+  }
 
-    console.log('[refreshAccessToken] Token refresh successful');
+  // Create new refresh promise
+  refreshPromise = (async () => {
+    try {
+      console.log('[refreshAccessToken] Attempting to refresh token...');
+      const tokens = await refreshSpotifyToken(refreshToken);
 
-    // Update cookies with new access token
-    const cookieStore = await cookies();
+      console.log('[refreshAccessToken] Token refresh successful');
 
-    cookieStore.set('spotify_access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: tokens.expires_in,
-    });
+      // Update cookies with new access token
+      const cookieStore = await cookies();
 
-    // Update refresh token if a new one was provided
-    if (tokens.refresh_token) {
-      cookieStore.set('spotify_refresh_token', tokens.refresh_token, {
+      cookieStore.set('spotify_access_token', tokens.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: tokens.expires_in,
       });
-    }
 
-    return { success: true, accessToken: tokens.access_token };
-  } catch (error) {
-    console.error('[refreshAccessToken] Token refresh failed:', error);
-    return { success: false, error: 'refresh_failed' };
-  }
+      // Update refresh token if a new one was provided
+      if (tokens.refresh_token) {
+        cookieStore.set('spotify_refresh_token', tokens.refresh_token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30, // 30 days
+        });
+      }
+
+      return { success: true, accessToken: tokens.access_token };
+    } catch (error) {
+      console.error('[refreshAccessToken] Token refresh failed:', error);
+      return { success: false, error: 'refresh_failed' };
+    } finally {
+      // Clear promise after completion (success or failure)
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 /**
