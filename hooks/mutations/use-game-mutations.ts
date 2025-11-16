@@ -1,7 +1,7 @@
 /**
  * Mutation hooks for game actions.
  *
- * Handles creating sessions, joining games, buzzing, and judging answers.
+ * Updated to use new RESTful API structure.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,55 +9,44 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 /**
  * Create a new game session.
  *
- * Example usage:
- * ```tsx
- * const createSession = useCreateSession();
- *
- * createSession.mutate(
- *   { hostName: 'Alice', packId: '...' },
- *   {
- *     onSuccess: (sessionId) => {
- *       router.push(`/host/${sessionId}`);
- *     }
- *   }
- * );
- * ```
+ * POST /api/sessions
  */
 export function useCreateSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { hostName: string; packId: string }) => {
-      const response = await fetch('/api/session/create', {
+    mutationFn: async (params: { packId: string }) => {
+      const response = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        body: JSON.stringify({ packId: params.packId }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to create session');
+        throw new Error(error.error || 'Failed to create session');
       }
 
       const data = await response.json();
-      return data.sessionId as string;
+      return data.id as string; // Return session ID
     },
     onSuccess: () => {
-      // Invalidate sessions list if we have one
-      queryClient.invalidateQueries({ queryKey: ['game_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
   });
 }
 
 /**
  * Join an existing game session as a player.
+ *
+ * POST /api/sessions/[id]/players
  */
 export function useJoinSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: { sessionId: string; playerName: string }) => {
-      const response = await fetch(`/api/session/${params.sessionId}/join`, {
+      const response = await fetch(`/api/sessions/${params.sessionId}/players`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerName: params.playerName }),
@@ -65,16 +54,15 @@ export function useJoinSession() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || error.message || 'Failed to join session');
+        throw new Error(error.error || 'Failed to join session');
       }
 
       const data = await response.json();
-      return data.playerId as string;
+      return data.id as string; // Return player ID
     },
     onSuccess: (_, variables) => {
-      // Invalidate players list for this session
       queryClient.invalidateQueries({
-        queryKey: ['game_sessions', variables.sessionId, 'players'],
+        queryKey: ['sessions', variables.sessionId, 'players'],
       });
     },
   });
@@ -82,54 +70,65 @@ export function useJoinSession() {
 
 /**
  * Start the game (host only).
+ *
+ * PATCH /api/sessions/[id] { action: "start" }
  */
 export function useStartGame() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/session/${sessionId}/start`, {
-        method: 'POST',
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to start game');
+        throw new Error(error.error || 'Failed to start game');
       }
 
       return response.json();
     },
     onSuccess: (_, sessionId) => {
-      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
   });
 }
 
 /**
  * Buzz in during a round (player action).
+ *
+ * POST /api/sessions/[id]/rounds/current/buzz
  */
 export function useBuzz() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: { sessionId: string; playerId: string }) => {
-      const response = await fetch(`/api/game/${params.sessionId}/buzz`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: params.playerId }),
-      });
+      const response = await fetch(
+        `/api/sessions/${params.sessionId}/rounds/current/buzz`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: params.playerId }),
+        }
+      );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to buzz');
+        throw new Error(error.error || 'Failed to buzz');
       }
 
       return response.json();
     },
     onSuccess: (_, variables) => {
-      // Invalidate game state to show buzzer
       queryClient.invalidateQueries({
-        queryKey: ['game_sessions', variables.sessionId],
+        queryKey: ['sessions', variables.sessionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId, 'rounds'],
       });
     },
   });
@@ -137,49 +136,159 @@ export function useBuzz() {
 
 /**
  * Judge an answer as correct or incorrect (host only).
+ *
+ * PATCH /api/sessions/[id]/rounds/current { action: "judge", correct: boolean }
  */
 export function useJudgeAnswer() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: {
-      sessionId: string;
-      correct: boolean;
-    }) => {
-      console.log('Judging answer:', params);
-      const response = await fetch(`/api/game/${params.sessionId}/judge`, {
-        method: 'POST',
+    mutationFn: async (params: { sessionId: string; correct: boolean }) => {
+      const response = await fetch(
+        `/api/sessions/${params.sessionId}/rounds/current`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'judge', correct: params.correct }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to judge answer');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId, 'players'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId, 'rounds'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId],
+      });
+    },
+  });
+}
+
+/**
+ * Reveal track without buzzing
+ *
+ * PATCH /api/sessions/[id]/rounds/current { action: "reveal" }
+ */
+export function useRevealTrack() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch(`/api/sessions/${sessionId}/rounds/current`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ correct: params.correct }),
+        body: JSON.stringify({ action: 'reveal' }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('Judge API error:', error);
-        throw new Error(error.error || error.message || 'Failed to judge answer');
+        throw new Error(error.error || 'Failed to reveal track');
       }
 
-      const result = await response.json();
-      console.log('Judge API result:', result);
-      return result;
+      return response.json();
     },
-    onSuccess: (data, variables) => {
-      console.log('Judge success, invalidating queries');
-      // Invalidate players to update scores
-      queryClient.invalidateQueries({
-        queryKey: ['game_sessions', variables.sessionId, 'players'],
+    onSuccess: (_, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    },
+  });
+}
+
+/**
+ * Start a round
+ *
+ * PATCH /api/sessions/[id]/rounds/current { action: "start" }
+ */
+export function useStartRound() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch(`/api/sessions/${sessionId}/rounds/current`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
       });
-      // Invalidate rounds history
-      queryClient.invalidateQueries({
-        queryKey: ['game_sessions', variables.sessionId, 'rounds'],
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start round');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    },
+  });
+}
+
+/**
+ * Advance to next round
+ *
+ * POST /api/sessions/[id]/rounds
+ */
+export function useNextRound() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch(`/api/sessions/${sessionId}/rounds`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
-      // Also invalidate session to update state
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to advance round');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
       queryClient.invalidateQueries({
-        queryKey: ['game_sessions', variables.sessionId],
+        queryKey: ['sessions', sessionId, 'rounds'],
       });
     },
-    onError: (error) => {
-      console.error('Judge mutation error:', error);
+  });
+}
+
+/**
+ * End the game
+ *
+ * PATCH /api/sessions/[id] { action: "end" }
+ */
+export function useEndGame() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to end game');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
   });
 }

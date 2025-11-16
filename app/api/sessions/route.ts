@@ -1,17 +1,8 @@
 /**
- * POST /api/session/create
+ * Sessions API
  *
- * Create a new game session (requires Spotify authentication).
- *
- * Request body:
- * {
- *   packId: string;
- * }
- *
- * Response:
- * {
- *   sessionId: string;
- * }
+ * GET  /api/sessions - List sessions
+ * POST /api/sessions - Create new session
  */
 
 import { NextResponse } from 'next/server';
@@ -19,6 +10,56 @@ import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import type { SupabaseSingleResponse } from '@/lib/types/supabase';
 
+/**
+ * GET /api/sessions
+ * List all sessions (for debugging/admin)
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const state = searchParams.get('state');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const offset = parseInt(searchParams.get('offset') || '0');
+
+    const supabase = await createClient();
+    let query = supabase
+      .from('game_sessions')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (state) {
+      query = query.eq('state', state);
+    }
+
+    const { data: sessions, error, count } = await query;
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      sessions: sessions || [],
+      total: count || 0,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error('Error in GET /api/sessions:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/sessions
+ * Create a new game session
+ *
+ * Request: { packId: string }
+ * Response: { id, code, host_name, pack_id, state, current_round, ... }
+ */
 export async function POST(request: Request) {
   try {
     // Verify host is authenticated with Spotify
@@ -82,8 +123,8 @@ export async function POST(request: Request) {
         state: 'lobby',
         current_round: 0,
       })
-      .select('id')
-      .single()) as SupabaseSingleResponse<{ id: string }>;
+      .select('*')
+      .single()) as SupabaseSingleResponse<any>;
 
     if (sessionError || !gameSession) {
       console.error('Failed to create session:', sessionError);
@@ -93,11 +134,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      sessionId: gameSession.id,
-    });
+    return NextResponse.json(gameSession);
   } catch (error) {
-    console.error('Error in /api/session/create:', error);
+    console.error('Error in POST /api/sessions:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
