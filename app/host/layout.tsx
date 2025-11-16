@@ -2,28 +2,37 @@
  * Host Layout
  *
  * Ensures user is authenticated with Spotify before accessing any host pages.
- * Provides Spotify user data to all child pages via context.
+ * Redirects to home if not authenticated (with error details).
+ * Provides unified Spotify auth context with guaranteed non-null user data.
  */
 
 import { redirect } from "next/navigation";
-import { getSpotifyUser } from "@/lib/spotify-user";
-import { SpotifyUserProvider } from "@/lib/spotify-context";
+import { getAuthenticatedUser } from "@/lib/spotify-auth-actions";
+import { SpotifyAuthProvider } from "@/lib/spotify-auth-context";
 
 export default async function HostLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getSpotifyUser();
+  const { user, error } = await getAuthenticatedUser();
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated - provider requires non-null user
   if (!user) {
+    console.log('[HostLayout] User not authenticated, redirecting to home', { error });
+
+    // Add error parameter if there was an auth error
+    if (error) {
+      redirect(`/?error=${error}`);
+    }
+
     redirect('/');
   }
 
+  // User is guaranteed to be non-null here
   return (
-    <SpotifyUserProvider user={user}>
+    <SpotifyAuthProvider user={user}>
       {children}
-    </SpotifyUserProvider>
+    </SpotifyAuthProvider>
   );
 }

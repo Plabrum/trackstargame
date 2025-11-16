@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { clearSpotifyAuth } from '@/lib/spotify-user';
+import { clearSpotifyAuth } from '@/lib/spotify-auth-actions';
 
 export async function POST() {
   await clearSpotifyAuth();

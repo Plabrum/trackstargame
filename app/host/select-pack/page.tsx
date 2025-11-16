@@ -9,21 +9,17 @@
 
 import { PackGallery } from "@/components/host/PackGallery";
 import { Button } from "@/components/ui/button";
-import { useSpotifyUser } from "@/lib/spotify-context";
+import { useSpotifyAuth } from "@/lib/spotify-auth-context";
 import { User, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 export default function SelectPackPage() {
-  const user = useSpotifyUser();
-  const router = useRouter();
+  const { user, logout } = useSpotifyAuth();
 
   async function handleLogout() {
-    // Call logout API
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/');
-    router.refresh();
+    await logout();
   }
 
+  // User is guaranteed to be non-null within SpotifyAuthProvider
   const displayName = user.display_name || user.email || 'User';
 
   return (

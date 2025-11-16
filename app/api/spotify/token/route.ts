@@ -1,16 +1,19 @@
 /**
  * Get Spotify access token from cookies
+ * Automatically refreshes token if expired
  */
 
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { getAccessToken } from '@/lib/spotify-auth-actions';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get('spotify_access_token')?.value;
+  const { accessToken, error } = await getAccessToken();
 
-  if (!accessToken) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  if (!accessToken || error) {
+    return NextResponse.json(
+      { error: error || 'Not authenticated' },
+      { status: 401 }
+    );
   }
 
   return NextResponse.json({ accessToken });
