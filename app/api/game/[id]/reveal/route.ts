@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/game/[id]/reveal
  *
@@ -9,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastStateChange } from '@/lib/game/realtime';
-import { getNextState } from '@/lib/game/state-machine';
+import { getNextState, validateGameState } from '@/lib/game/state-machine';
 
 export async function POST(
   request: Request,
@@ -40,12 +39,13 @@ export async function POST(
     }
 
     // Transition to reveal state (no buzz/timeout case)
-    const newState = getNextState(session.state as any, 'judge');
+    const gameState = validateGameState(session.state);
+    const newState = getNextState(gameState, 'judge');
 
     const { error: updateError } = await supabase
       .from('game_sessions')
       .update({ state: newState })
-      .eq('id', sessionId) as { error: any };
+      .eq('id', sessionId);
 
     if (updateError) {
       console.error('Failed to update game state:', updateError);

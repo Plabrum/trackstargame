@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/game/[id]/end
  *
@@ -9,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
+import { getNextState, validateGameState } from '@/lib/game/state-machine';
 
 export async function POST(
   request: Request,
@@ -30,18 +30,20 @@ export async function POST(
     }
 
     // Can't end a game that's already finished
-    if (session.state === 'finished') {
+    const gameState = validateGameState(session.state);
+    if (gameState === 'finished') {
       return NextResponse.json(
         { error: 'Game is already finished' },
         { status: 400 }
       );
     }
 
-    // Update to finished state
+    // Update to finished state using state machine
+    const newState = getNextState(gameState, 'finish');
     const { error: updateError } = await supabase
       .from('game_sessions')
-      .update({ state: 'finished' })
-      .eq('id', sessionId) as { error: any };
+      .update({ state: newState })
+      .eq('id', sessionId);
 
     if (updateError) {
       console.error('Failed to end game:', updateError);
@@ -61,7 +63,7 @@ export async function POST(
     const leaderboard = players?.map(p => ({
       playerId: p.id,
       playerName: p.name,
-      score: p.score,
+      score: p.score ?? 0,
     })) || [];
 
     const winner = leaderboard[0] || null;

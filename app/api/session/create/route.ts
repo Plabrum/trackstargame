@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/session/create
  *
@@ -18,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
+import type { SupabaseSingleResponse } from '@/lib/types/supabase';
 
 export async function POST(request: Request) {
   try {
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     }
 
     // Create game session
-    const { data: gameSession, error: sessionError } = await supabase
+    const { data: gameSession, error: sessionError } = (await supabase
       .from('game_sessions')
       .insert({
         host_name: hostName,
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         current_round: 0,
       })
       .select('id')
-      .single() as { data: { id: string } | null; error: any };
+      .single()) as SupabaseSingleResponse<{ id: string }>;
 
     if (sessionError || !gameSession) {
       console.error('Failed to create session:', sessionError);

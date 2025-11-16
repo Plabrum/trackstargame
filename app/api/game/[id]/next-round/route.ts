@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/game/[id]/next-round
  *
@@ -24,7 +23,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
-import { getNextState, GAME_CONFIG } from '@/lib/game/state-machine';
+import { getNextState, validateGameState, GAME_CONFIG } from '@/lib/game/state-machine';
 
 export async function POST(
   request: Request,
@@ -52,6 +51,13 @@ export async function POST(
       );
     }
 
+    if (!session.current_round) {
+      return NextResponse.json(
+        { error: 'No current round' },
+        { status: 400 }
+      );
+    }
+
     // Determine if this is the last round
     const isLastRound = session.current_round >= GAME_CONFIG.TOTAL_ROUNDS;
 
@@ -60,7 +66,7 @@ export async function POST(
       const { error: updateError } = await supabase
         .from('game_sessions')
         .update({ state: 'finished' })
-        .eq('id', sessionId) as { error: any };
+        .eq('id', sessionId);
 
       if (updateError) {
         console.error('Failed to finish game:', updateError);
@@ -80,7 +86,7 @@ export async function POST(
       const leaderboard = players?.map(p => ({
         playerId: p.id,
         playerName: p.name,
-        score: p.score,
+        score: p.score ?? 0,
       })) || [];
 
       const winner = leaderboard[0] || null;
@@ -102,8 +108,9 @@ export async function POST(
 
     // Advance to next round
     const nextRound = session.current_round + 1;
+    const gameState = validateGameState(session.state);
     const newState = getNextState(
-      session.state as any,
+      gameState,
       'next_round',
       { currentRound: session.current_round }
     );
@@ -143,7 +150,7 @@ export async function POST(
         current_round: nextRound,
         round_start_time: roundStartTime,
       })
-      .eq('id', sessionId) as { error: any };
+      .eq('id', sessionId);
 
     if (updateError) {
       console.error('Failed to advance round:', updateError);

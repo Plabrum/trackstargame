@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/game/[id]/buzz
  *
@@ -22,7 +21,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
-import { getNextState, canBuzz } from '@/lib/game/state-machine';
+import { getNextState, canBuzz, validateGameState, GAME_CONFIG } from '@/lib/game/state-machine';
 
 export async function POST(
   request: Request,
@@ -60,7 +59,8 @@ export async function POST(
     console.log('Session state:', session);
 
     // Validate game state allows buzzing
-    if (!canBuzz(session.state as any)) {
+    const gameState = validateGameState(session.state);
+    if (!canBuzz(gameState)) {
       console.log('Cannot buzz in state:', session.state);
       return NextResponse.json(
         { error: 'Cannot buzz in current game state', state: session.state },
@@ -72,6 +72,14 @@ export async function POST(
       console.log('Round has not started');
       return NextResponse.json(
         { error: 'Round has not started' },
+        { status: 400 }
+      );
+    }
+
+    if (!session.current_round) {
+      console.log('No current round');
+      return NextResponse.json(
+        { error: 'No current round' },
         { status: 400 }
       );
     }
@@ -99,6 +107,15 @@ export async function POST(
       elapsedMs: buzzTime.getTime() - startTime.getTime(),
       elapsedSeconds
     });
+
+    // Validate elapsed time is within valid range
+    if (elapsedSeconds < 0 || elapsedSeconds > GAME_CONFIG.MAX_TRACK_LENGTH_SECONDS) {
+      console.log('Invalid elapsed time:', elapsedSeconds);
+      return NextResponse.json(
+        { error: 'Invalid buzz timing - please try again' },
+        { status: 400 }
+      );
+    }
 
     // Atomic first-buzz-wins: Update game_rounds table
     // Only update if buzzer_player_id is NULL (no one has buzzed yet)
@@ -131,7 +148,7 @@ export async function POST(
         elapsed_seconds: elapsedSeconds,
       })
       .eq('id', round.id)
-      .is('buzzer_player_id', null) as { error: any }; // Atomic check
+      .is('buzzer_player_id', null); // Atomic check
 
     if (updateRoundError) {
       console.error('Failed to record buzz:', updateRoundError);
@@ -143,14 +160,18 @@ export async function POST(
     }
 
     // Update session state to 'buzzed'
-    const newState = getNextState(session.state as any, 'buzz');
+    const newState = getNextState(gameState, 'buzz');
     const { error: stateError } = await supabase
       .from('game_sessions')
       .update({ state: newState })
-      .eq('id', sessionId) as { error: any };
+      .eq('id', sessionId);
 
     if (stateError) {
       console.error('Failed to update game state:', stateError);
+      return NextResponse.json(
+        { error: 'Failed to update game state' },
+        { status: 500 }
+      );
     }
 
     // Broadcast buzz event

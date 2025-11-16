@@ -25,15 +25,12 @@ export function useGameSession(sessionId: string | null) {
     queryFn: async () => {
       if (!sessionId) return null;
 
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('game_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
-
-      if (error) throw error;
-      return data as GameSession;
+      const response = await fetch(`/api/game/${sessionId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch game session');
+      }
+      return response.json() as Promise<GameSession>;
     },
     enabled: !!sessionId,
   });
@@ -79,15 +76,12 @@ export function useGamePlayers(sessionId: string | null) {
     queryFn: async () => {
       if (!sessionId) return [];
 
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('players')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('score', { ascending: false });
-
-      if (error) throw error;
-      return data as Player[];
+      const response = await fetch(`/api/game/${sessionId}/players`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch players');
+      }
+      return response.json() as Promise<Player[]>;
     },
     enabled: !!sessionId,
   });
@@ -132,15 +126,12 @@ export function useGameRounds(sessionId: string | null) {
     queryFn: async () => {
       if (!sessionId) return [];
 
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('game_rounds')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('round_number', { ascending: true });
-
-      if (error) throw error;
-      return data as GameRound[];
+      const response = await fetch(`/api/game/${sessionId}/rounds`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch rounds');
+      }
+      return response.json() as Promise<GameRound[]>;
     },
     enabled: !!sessionId,
   });

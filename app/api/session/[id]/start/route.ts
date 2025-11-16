@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/session/[id]/start
  *
@@ -15,7 +14,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
-import { isValidPlayerCount, getNextState } from '@/lib/game/state-machine';
+import { isValidPlayerCount, getNextState, GAME_CONFIG } from '@/lib/game/state-machine';
 
 export async function POST(
   request: Request,
@@ -51,7 +50,14 @@ export async function POST(
 
     if (count === null || !isValidPlayerCount(count)) {
       return NextResponse.json(
-        { error: `Need ${isValidPlayerCount(count || 0) ? '' : 'between 2 and 10'} players to start` },
+        { error: `Need between ${GAME_CONFIG.MIN_PLAYERS} and ${GAME_CONFIG.MAX_PLAYERS} players to start` },
+        { status: 400 }
+      );
+    }
+
+    if (!session.pack_id) {
+      return NextResponse.json(
+        { error: 'No pack selected for this session' },
         { status: 400 }
       );
     }
@@ -70,6 +76,16 @@ export async function POST(
       );
     }
 
+    // Validate pack has enough tracks for a full game
+    if (tracks.length < GAME_CONFIG.TOTAL_ROUNDS) {
+      return NextResponse.json(
+        {
+          error: `Pack must have at least ${GAME_CONFIG.TOTAL_ROUNDS} tracks. This pack has ${tracks.length}.`
+        },
+        { status: 400 }
+      );
+    }
+
     // Shuffle tracks using Fisher-Yates algorithm
     const shuffledTracks = [...tracks];
     for (let i = shuffledTracks.length - 1; i > 0; i--) {
@@ -77,16 +93,18 @@ export async function POST(
       [shuffledTracks[i], shuffledTracks[j]] = [shuffledTracks[j], shuffledTracks[i]];
     }
 
-    // Create all game rounds upfront with shuffled order
-    const roundsToInsert = shuffledTracks.map((track, index) => ({
-      session_id: sessionId,
-      round_number: index + 1,
-      track_id: track.id,
-    }));
+    // Create exactly TOTAL_ROUNDS game rounds with shuffled tracks
+    const roundsToInsert = shuffledTracks
+      .slice(0, GAME_CONFIG.TOTAL_ROUNDS)
+      .map((track, index) => ({
+        session_id: sessionId,
+        round_number: index + 1,
+        track_id: track.id,
+      }));
 
     const { error: roundsError } = await supabase
       .from('game_rounds')
-      .insert(roundsToInsert) as { error: any };
+      .insert(roundsToInsert);
 
     if (roundsError) {
       console.error('Failed to create rounds:', roundsError);
@@ -104,7 +122,7 @@ export async function POST(
         state: newState,
         current_round: 1,
       })
-      .eq('id', sessionId) as { error: any };
+      .eq('id', sessionId);
 
     if (updateError) {
       console.error('Failed to start game:', updateError);

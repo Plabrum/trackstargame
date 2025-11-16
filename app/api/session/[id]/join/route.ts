@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/session/[id]/join
  *
@@ -18,7 +17,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastGameEvent } from '@/lib/game/realtime';
-import { isValidPlayerCount } from '@/lib/game/state-machine';
+import { GAME_CONFIG } from '@/lib/game/state-machine';
+import type { SupabaseSingleResponse } from '@/lib/types/supabase';
 
 export async function POST(
   request: Request,
@@ -56,21 +56,21 @@ export async function POST(
       );
     }
 
-    // Check current player count (max 10 players)
+    // Check current player count
     const { count } = await supabase
       .from('players')
       .select('*', { count: 'exact', head: true })
       .eq('session_id', sessionId);
 
-    if (count !== null && count >= 10) {
+    if (count !== null && count >= GAME_CONFIG.MAX_PLAYERS) {
       return NextResponse.json(
-        { error: 'Game is full (maximum 10 players)' },
+        { error: `Game is full (maximum ${GAME_CONFIG.MAX_PLAYERS} players)` },
         { status: 400 }
       );
     }
 
     // Add player to session
-    const { data: player, error: playerError } = await supabase
+    const { data: player, error: playerError } = (await supabase
       .from('players')
       .insert({
         session_id: sessionId,
@@ -78,11 +78,11 @@ export async function POST(
         score: 0,
       })
       .select('id, name')
-      .single() as { data: { id: string; name: string } | null; error: any };
+      .single()) as SupabaseSingleResponse<{ id: string; name: string }>;
 
-    if (playerError) {
+    if (playerError || !player) {
       // Check for duplicate name
-      if (playerError.code === '23505') {
+      if (playerError?.code === '23505') {
         return NextResponse.json(
           { error: 'Player name already taken in this game' },
           { status: 409 }

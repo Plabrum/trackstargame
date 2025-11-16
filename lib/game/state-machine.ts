@@ -17,6 +17,24 @@ const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
 };
 
 /**
+ * Type guard to check if a string is a valid GameState.
+ */
+export function isGameState(state: string): state is GameState {
+  return ['lobby', 'playing', 'buzzed', 'reveal', 'finished'].includes(state);
+}
+
+/**
+ * Validate and convert a string to GameState.
+ * Throws an error if the state is invalid.
+ */
+export function validateGameState(state: string | null): GameState {
+  if (!state || !isGameState(state)) {
+    throw new Error(`Invalid game state: ${state}`);
+  }
+  return state;
+}
+
+/**
  * Validate if a state transition is allowed.
  */
 export function isValidTransition(from: GameState, to: GameState): boolean {
@@ -32,29 +50,29 @@ export function isValidTransition(from: GameState, to: GameState): boolean {
  */
 export function calculatePoints(elapsedSeconds: number, correct: boolean): number {
   if (!correct) {
-    return -10;
+    return GAME_CONFIG.INCORRECT_PENALTY;
   }
 
-  // Correct answer: 30 - elapsed_seconds
+  // Correct answer: MAX_POINTS_PER_ROUND - elapsed_seconds
   // Example: buzzed at 3.5s = 26.5 points
-  const points = 30 - elapsedSeconds;
+  const points = GAME_CONFIG.MAX_POINTS_PER_ROUND - elapsedSeconds;
 
-  // Minimum 1 point for correct answers (even if slow)
-  return Math.max(1, Math.round(points * 10) / 10);
+  // Minimum MIN_POINTS_FOR_CORRECT for correct answers (even if slow)
+  return Math.max(GAME_CONFIG.MIN_POINTS_FOR_CORRECT, Math.round(points * 10) / 10);
 }
 
 /**
  * Validate player count for game start.
  */
 export function isValidPlayerCount(count: number): boolean {
-  return count >= 2 && count <= 10;
+  return count >= GAME_CONFIG.MIN_PLAYERS && count <= GAME_CONFIG.MAX_PLAYERS;
 }
 
 /**
  * Check if a round number is valid.
  */
 export function isValidRound(roundNumber: number): boolean {
-  return roundNumber >= 1 && roundNumber <= 10;
+  return roundNumber >= GAME_CONFIG.MIN_ROUND_NUMBER && roundNumber <= GAME_CONFIG.TOTAL_ROUNDS;
 }
 
 /**
@@ -83,7 +101,7 @@ export function getNextState(
     case 'next_round':
       if (currentState === 'reveal') {
         // Check if this was the last round
-        if (params?.currentRound === 10) {
+        if (params?.currentRound === GAME_CONFIG.TOTAL_ROUNDS) {
           return 'finished';
         }
         return 'playing';
@@ -112,7 +130,9 @@ export const GAME_CONFIG = {
   MIN_PLAYERS: 2,
   MAX_PLAYERS: 10,
   TOTAL_ROUNDS: 10,
+  MIN_ROUND_NUMBER: 1,
   MAX_POINTS_PER_ROUND: 30,
+  MAX_TRACK_LENGTH_SECONDS: 30,
   INCORRECT_PENALTY: -10,
   MIN_POINTS_FOR_CORRECT: 1,
 } as const;

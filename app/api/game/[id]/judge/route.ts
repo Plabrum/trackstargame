@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/game/[id]/judge
  *
@@ -21,7 +20,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
-import { calculatePoints, getNextState } from '@/lib/game/state-machine';
+import { calculatePoints, getNextState, validateGameState, GAME_CONFIG } from '@/lib/game/state-machine';
 
 export async function POST(
   request: Request,
@@ -52,9 +51,18 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    if (session.state !== 'buzzed' && session.state !== 'playing') {
+    // Only allow judging in 'buzzed' state (someone must have buzzed)
+    const gameState = validateGameState(session.state);
+    if (gameState !== 'buzzed') {
       return NextResponse.json(
-        { error: 'Cannot judge in current game state' },
+        { error: 'Cannot judge - no one has buzzed yet' },
+        { status: 400 }
+      );
+    }
+
+    if (!session.current_round) {
+      return NextResponse.json(
+        { error: 'No current round' },
         { status: 400 }
       );
     }
@@ -71,13 +79,34 @@ export async function POST(
       return NextResponse.json({ error: 'Round not found' }, { status: 404 });
     }
 
+    if (!round.tracks) {
+      return NextResponse.json({ error: 'Track data not found' }, { status: 404 });
+    }
+
+    // CRITICAL: Prevent double judgment - check if round was already judged
+    if (round.correct !== null) {
+      return NextResponse.json(
+        { error: 'This round has already been judged' },
+        { status: 400 }
+      );
+    }
+
     let pointsAwarded = 0;
     let buzzerPlayerId = round.buzzer_player_id;
 
-    // If someone buzzed, calculate points
+    // Validate elapsed_seconds is within valid range before calculating points
     if (buzzerPlayerId && round.elapsed_seconds != null) {
-      pointsAwarded = calculatePoints(Number(round.elapsed_seconds), correct);
-      console.log('Awarding points:', { buzzerPlayerId, pointsAwarded, correct, elapsed: round.elapsed_seconds });
+      const elapsed = Number(round.elapsed_seconds);
+
+      if (elapsed < 0 || elapsed > GAME_CONFIG.MAX_TRACK_LENGTH_SECONDS) {
+        return NextResponse.json(
+          { error: 'Invalid elapsed time in round data' },
+          { status: 500 }
+        );
+      }
+
+      pointsAwarded = calculatePoints(elapsed, correct);
+      console.log('Awarding points:', { buzzerPlayerId, pointsAwarded, correct, elapsed });
 
       // Update player score
       const { error: scoreError } = await supabase.rpc('increment_player_score', {
@@ -107,36 +136,51 @@ export async function POST(
 
           if (updateError) {
             console.error('Failed to update player score:', updateError);
+            return NextResponse.json(
+              { error: 'Failed to update player score' },
+              { status: 500 }
+            );
           }
         }
       } else {
         console.log('Score updated successfully via RPC');
       }
 
-      // Update round with result
+      // Update round with result - use atomic check to prevent double judgment
       const { error: roundUpdateError } = await supabase
         .from('game_rounds')
         .update({
           correct,
           points_awarded: pointsAwarded,
         })
-        .eq('id', round.id) as { error: any };
+        .eq('id', round.id)
+        .is('correct', null); // Atomic check
 
       if (roundUpdateError) {
         console.error('Failed to update round:', roundUpdateError);
-      } else {
-        console.log('Round updated with result');
+        return NextResponse.json(
+          { error: 'Failed to update round - may have been judged already' },
+          { status: 500 }
+        );
       }
-    } else {
-      console.log('No buzzer or elapsed time, skipping points');
+
+      console.log('Round updated with result');
     }
 
     // Update session state to 'reveal'
-    const newState = getNextState(session.state as any, 'judge');
-    await supabase
+    const newState = getNextState(gameState, 'judge');
+    const { error: stateError } = await supabase
       .from('game_sessions')
       .update({ state: newState })
       .eq('id', sessionId);
+
+    if (stateError) {
+      console.error('Failed to update session state:', stateError);
+      return NextResponse.json(
+        { error: 'Failed to update game state' },
+        { status: 500 }
+      );
+    }
 
     // Get updated leaderboard
     const { data: players } = await supabase
@@ -148,7 +192,7 @@ export async function POST(
     const leaderboard = players?.map(p => ({
       playerId: p.id,
       playerName: p.name,
-      score: p.score,
+      score: p.score ?? 0,
     })) || [];
 
     // Broadcast events

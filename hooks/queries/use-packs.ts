@@ -5,7 +5,6 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import type { Tables } from '@/lib/types/database';
 
 type Pack = Tables<'packs'>;
@@ -18,14 +17,12 @@ export function usePacks() {
   return useQuery({
     queryKey: ['packs'],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('packs')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as Pack[];
+      const response = await fetch('/api/packs');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch packs');
+      }
+      return response.json() as Promise<Pack[]>;
     },
   });
 }
@@ -39,18 +36,12 @@ export function usePack(packId: string | null) {
     queryFn: async () => {
       if (!packId) return null;
 
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('packs')
-        .select(`
-          *,
-          tracks (*)
-        `)
-        .eq('id', packId)
-        .single();
-
-      if (error) throw error;
-      return data as Pack & { tracks: Track[] };
+      const response = await fetch(`/api/packs/${packId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch pack');
+      }
+      return response.json() as Promise<Pack & { tracks: Track[] }>;
     },
     enabled: !!packId,
   });
@@ -65,15 +56,12 @@ export function usePackTracks(packId: string | null) {
     queryFn: async () => {
       if (!packId) return [];
 
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('tracks')
-        .select('*')
-        .eq('pack_id', packId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data as Track[];
+      const response = await fetch(`/api/packs/${packId}/tracks`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch tracks');
+      }
+      return response.json() as Promise<Track[]>;
     },
     enabled: !!packId,
   });

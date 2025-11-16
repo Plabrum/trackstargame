@@ -1,4 +1,3 @@
-// @ts-nocheck - Supabase type inference issues
 /**
  * POST /api/game/[id]/start-round
  *
@@ -14,7 +13,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
+import { broadcastGameEvent } from '@/lib/game/realtime';
 
 export async function POST(
   request: Request,
@@ -38,6 +37,13 @@ export async function POST(
     if (session.state !== 'playing') {
       return NextResponse.json(
         { error: 'Game is not in playing state' },
+        { status: 400 }
+      );
+    }
+
+    if (!session.current_round) {
+      return NextResponse.json(
+        { error: 'No current round' },
         { status: 400 }
       );
     }
@@ -75,7 +81,7 @@ export async function POST(
       .update({
         round_start_time: roundStartTime,
       })
-      .eq('id', sessionId) as { error: any };
+      .eq('id', sessionId);
 
     if (updateError) {
       console.error('Failed to update session:', updateError);
