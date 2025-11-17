@@ -3,29 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Music, AlertCircle } from "lucide-react";
+import { Music } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSpotifyAuthUrl } from "@/lib/spotify-auth";
 import { randomBytes } from "crypto";
+import { AuthErrorToast } from "@/components/auth-error-toast";
+import { Suspense } from "react";
 
-const ERROR_MESSAGES: Record<string, string> = {
-  token_expired: "Your session expired. Please sign in again.",
-  refresh_failed: "Failed to refresh your session. Please sign in again.",
-  api_error: "An error occurred with Spotify. Please try again.",
-  network_error: "Network error. Please check your connection and try again.",
-  spotify_auth_failed: "Spotify authentication failed. Please try again.",
-  no_code: "Authentication failed - no code received from Spotify.",
-  token_exchange_failed: "Failed to exchange authentication code. Please try again.",
-};
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const params = await searchParams;
-  const errorCode = params.error;
-  const errorMessage = errorCode ? ERROR_MESSAGES[errorCode] || "An error occurred. Please try again." : null;
+export default async function Home() {
   async function handleJoinGame(formData: FormData) {
     "use server";
     const gameCode = formData.get("gameCode") as string;
@@ -43,6 +28,11 @@ export default async function Home({
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-slate-100">
+      {/* Auth error toast */}
+      <Suspense>
+        <AuthErrorToast />
+      </Suspense>
+
       <div className="w-full max-w-4xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-3">
@@ -53,18 +43,6 @@ export default async function Home({
             Music Guessing Game - Buzz in and test your knowledge!
           </p>
         </div>
-
-        {/* Error Message */}
-        {errorMessage && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 text-red-800">
-                <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                <p className="text-sm font-medium">{errorMessage}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Main cards */}
         <div className="grid md:grid-cols-2 gap-6">

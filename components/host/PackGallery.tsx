@@ -9,37 +9,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { PackCard } from "./PackCard";
 import { PackSongsSheet } from "./PackSongsSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import type { Tables } from "@/lib/types/database";
-
-type Pack = Tables<'packs'>;
-
-interface PackWithTrackCount extends Pack {
-  track_count: number;
-}
+import { useGetApiPacks } from "@/lib/api/packs/packs";
+import type { GetApiPacks200Item } from "@/lib/api/model";
 
 export function PackGallery() {
   const router = useRouter();
-  const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
+  const [selectedPack, setSelectedPack] = useState<GetApiPacks200Item | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [startingPackId, setStartingPackId] = useState<string | null>(null);
 
-  // Fetch all packs with track counts
-  const { data: packs, isLoading, error } = useQuery({
-    queryKey: ['packs_with_counts'],
-    queryFn: async () => {
-      const response = await fetch('/api/packs/with-counts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch packs');
-      }
-      return response.json() as Promise<PackWithTrackCount[]>;
-    },
+  // Fetch all packs with track counts using orval-generated hook
+  const { data: packsResponse, isLoading, error } = useGetApiPacks({
+    include: 'track_count'
   });
+
+  const packs = packsResponse?.data;
 
   // Create session mutation
   const createSession = useMutation({
@@ -71,7 +61,7 @@ export function PackGallery() {
     },
   });
 
-  const handleViewSongs = (pack: Pack) => {
+  const handleViewSongs = (pack: GetApiPacks200Item) => {
     setSelectedPack(pack);
     setSheetOpen(true);
   };
@@ -126,7 +116,7 @@ export function PackGallery() {
           <PackCard
             key={pack.id}
             pack={pack}
-            trackCount={pack.track_count}
+            trackCount={pack.track_count ?? 0}
             onViewSongs={() => handleViewSongs(pack)}
             onStartGame={() => handleStartGame(pack.id)}
             isStarting={startingPackId === pack.id}

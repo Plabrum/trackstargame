@@ -2,6 +2,7 @@
  * Custom fetch wrapper for Orval-generated client
  *
  * Handles authentication, base URL, and error formatting.
+ * Wraps responses in the format orval expects: { data, status, headers }
  */
 
 export type ErrorType<Error> = Error;
@@ -29,6 +30,14 @@ export const customFetch = <T>(
       const error = await response.json();
       throw new Error(error.error || 'Request failed');
     }
-    return response.json();
+
+    const data = await response.json();
+
+    // Wrap response in orval's expected format
+    return {
+      data,
+      status: response.status,
+      headers: response.headers,
+    } as T;
   });
 };

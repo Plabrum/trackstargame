@@ -1,12 +1,13 @@
 /**
  * Spotify Auth Server Actions
  * Server-side actions for authentication and token management
+ *
+ * Note: Token refresh is handled by middleware.ts to avoid cookie-setting issues
  */
 
 'use server';
 
 import { cookies } from 'next/headers';
-import { refreshSpotifyToken } from './spotify-auth';
 
 export interface SpotifyUser {
   display_name: string;
@@ -16,73 +17,23 @@ export interface SpotifyUser {
 }
 
 /**
- * Refresh buffer to avoid edge cases where token expires during request
- * Tokens will be refreshed 5 minutes before actual expiration
+ * Note: Token refresh is now handled by middleware.ts
+ * This ensures tokens are always fresh before requests reach server components
  */
-const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * In-flight refresh promise to prevent race conditions
- * If multiple requests try to refresh simultaneously, they'll reuse this promise
+ * Get the access token from cookies
+ * Middleware ensures it's always fresh, so we just read it
  */
-let refreshPromise: Promise<{
-  success: boolean;
-  accessToken?: string;
-  error?: string;
-}> | null = null;
-
-/**
- * Check if a JWT token is expired (or close to expiring) by decoding it
- * Spotify access tokens are JWTs with standard expiration claims
- */
-function isTokenExpired(token: string): boolean {
-  try {
-    // Decode JWT payload (second part of token)
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return true;
-
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-
-    const payload = JSON.parse(jsonPayload);
-
-    // Check if token has expired (exp is in seconds, Date.now() is in ms)
-    if (!payload.exp) return true;
-
-    // Refresh slightly before actual expiration to avoid edge cases
-    const isExpired = payload.exp * 1000 - REFRESH_BUFFER_MS < Date.now();
-    console.log('[isTokenExpired]', {
-      exp: new Date(payload.exp * 1000).toISOString(),
-      now: new Date().toISOString(),
-      bufferMinutes: REFRESH_BUFFER_MS / 60000,
-      isExpired,
-    });
-
-    return isExpired;
-  } catch (error) {
-    console.error('[isTokenExpired] Failed to decode token:', error);
-    return true; // Treat invalid tokens as expired
-  }
-}
-
-/**
- * Ensure we have a valid access token, refreshing if necessary
- * Single source of truth for token validation and refresh
- */
-async function ensureValidToken(): Promise<{
+async function getValidToken(): Promise<{
   accessToken: string | null;
   error?: string;
 }> {
   const cookieStore = await cookies();
-  let accessToken = cookieStore.get('spotify_access_token')?.value;
+  const accessToken = cookieStore.get('spotify_access_token')?.value;
   const refreshToken = cookieStore.get('spotify_refresh_token')?.value;
 
-  console.log('[ensureValidToken] Checking tokens:', {
+  console.log('[getValidToken] Checking tokens:', {
     hasAccessToken: !!accessToken,
     hasRefreshToken: !!refreshToken,
   });
@@ -92,34 +43,13 @@ async function ensureValidToken(): Promise<{
     return { accessToken: null, error: 'not_authenticated' };
   }
 
-  // Have access token - check if it's expired
+  // Have access token (middleware ensures it's fresh)
   if (accessToken) {
-    if (!isTokenExpired(accessToken)) {
-      // Token is still valid
-      return { accessToken };
-    }
-
-    // Token expired - try to refresh
-    console.log('[ensureValidToken] Access token expired, attempting refresh...');
-    if (refreshToken) {
-      const refreshResult = await refreshAccessToken(refreshToken);
-      if (refreshResult.success && refreshResult.accessToken) {
-        return { accessToken: refreshResult.accessToken };
-      }
-      return { accessToken: null, error: 'refresh_failed' };
-    }
-
-    // No refresh token available
-    return { accessToken: null, error: 'token_expired' };
+    return { accessToken };
   }
 
-  // No access token but have refresh token
+  // No access token but have refresh token means middleware failed to refresh
   if (refreshToken) {
-    console.log('[ensureValidToken] No access token, attempting refresh...');
-    const refreshResult = await refreshAccessToken(refreshToken);
-    if (refreshResult.success && refreshResult.accessToken) {
-      return { accessToken: refreshResult.accessToken };
-    }
     return { accessToken: null, error: 'refresh_failed' };
   }
 
@@ -128,14 +58,14 @@ async function ensureValidToken(): Promise<{
 
 /**
  * Get the current authenticated Spotify user
- * Automatically refreshes token if expired
+ * Middleware ensures token is fresh before this is called
  */
 export async function getAuthenticatedUser(): Promise<{
   user: SpotifyUser | null;
   error?: string;
 }> {
-  // Get a valid token (with auto-refresh)
-  const { accessToken, error } = await ensureValidToken();
+  // Get token (middleware already refreshed if needed)
+  const { accessToken, error } = await getValidToken();
 
   if (!accessToken) {
     console.log('[getAuthenticatedUser] No valid token available:', { error });
@@ -188,62 +118,6 @@ async function fetchSpotifyUser(accessToken: string): Promise<{
 }
 
 /**
- * Refresh the access token using the refresh token
- * Deduplicates concurrent refresh requests to prevent race conditions
- */
-async function refreshAccessToken(refreshToken: string): Promise<{
-  success: boolean;
-  accessToken?: string;
-  error?: string;
-}> {
-  // Reuse in-flight refresh request if one exists
-  if (refreshPromise) {
-    console.log('[refreshAccessToken] Reusing in-flight refresh request');
-    return refreshPromise;
-  }
-
-  // Create new refresh promise
-  refreshPromise = (async () => {
-    try {
-      console.log('[refreshAccessToken] Attempting to refresh token...');
-      const tokens = await refreshSpotifyToken(refreshToken);
-
-      console.log('[refreshAccessToken] Token refresh successful');
-
-      // Update cookies with new access token
-      const cookieStore = await cookies();
-
-      cookieStore.set('spotify_access_token', tokens.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: tokens.expires_in,
-      });
-
-      // Update refresh token if a new one was provided
-      if (tokens.refresh_token) {
-        cookieStore.set('spotify_refresh_token', tokens.refresh_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30, // 30 days
-        });
-      }
-
-      return { success: true, accessToken: tokens.access_token };
-    } catch (error) {
-      console.error('[refreshAccessToken] Token refresh failed:', error);
-      return { success: false, error: 'refresh_failed' };
-    } finally {
-      // Clear promise after completion (success or failure)
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
-}
-
-/**
  * Clear Spotify authentication cookies (logout)
  */
 export async function clearSpotifyAuth() {
@@ -254,12 +128,12 @@ export async function clearSpotifyAuth() {
 
 /**
  * Get access token for client-side use (e.g., Web Playback SDK)
- * Automatically refreshes if expired
+ * Middleware ensures it's fresh
  */
 export async function getAccessToken(): Promise<{
   accessToken: string | null;
   error?: string;
 }> {
   // Use shared token validation logic
-  return ensureValidToken();
+  return getValidToken();
 }
