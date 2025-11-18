@@ -1,11 +1,72 @@
 /**
  * Game state machine and business logic.
  *
- * Defines states, transitions, scoring, and validation rules.
+ * Defines states, transitions, scoring, validation rules, and available actions per state/role.
  */
 
 // Game states
 export type GameState = 'lobby' | 'playing' | 'buzzed' | 'submitted' | 'reveal' | 'finished';
+
+// User roles
+export type Role = 'host' | 'player';
+
+// Host actions
+export type HostAction =
+  | { type: 'start_game' }
+  | { type: 'judge_answer'; correct: boolean }
+  | { type: 'finalize_judgments'; overrides?: Record<string, boolean> }
+  | { type: 'advance_round' }
+  | { type: 'end_game' }
+  | { type: 'update_settings'; settings: GameSettings }
+  | { type: 'reveal_answer' }; // For timeout case (no buzz)
+
+// Player actions
+export type PlayerAction =
+  | { type: 'join_session'; playerName: string }
+  | { type: 'buzz' }
+  | { type: 'submit_answer'; answer: string };
+
+// Game settings (matches database schema)
+export type GameSettings = {
+  allow_host_to_play?: boolean;
+  allow_single_user?: boolean;
+  enable_text_input_mode?: boolean;
+  total_rounds?: number;
+};
+
+// Action descriptor with metadata for UI rendering
+export type ActionDescriptor<T = HostAction | PlayerAction> = {
+  action: T;
+  label: string;
+  description: string;
+  enabled: boolean;
+  disabledReason?: string;
+  variant?: 'primary' | 'secondary' | 'danger';
+};
+
+// Game context required to determine available actions
+export type GameContext = {
+  // Session info
+  sessionId: string;
+  state: GameState;
+  currentRound: number;
+  totalRounds: number;
+
+  // Settings
+  allowSingleUser: boolean;
+  allowHostToPlay: boolean;
+  enableTextInputMode: boolean;
+
+  // Player info
+  playerCount: number;
+  hasJoined: boolean; // For current player/host
+  playerId?: string; // Current player/host ID
+
+  // Round-specific info (for 'playing', 'buzzed', 'submitted' states)
+  hasPlayerBuzzed?: boolean; // Has anyone buzzed in current round
+  hasCurrentPlayerSubmitted?: boolean; // Has current player submitted in current round
+  allPlayersSubmitted?: boolean; // Have all players submitted in current round
+};
 
 // State transitions mapping
 const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
@@ -150,3 +211,217 @@ export const GAME_CONFIG = {
   INCORRECT_PENALTY: -10,
   MIN_POINTS_FOR_CORRECT: 1,
 } as const;
+
+/**
+ * Get available actions for a given game state and role.
+ *
+ * This is the core of the action-based state machine. Given the current game state,
+ * user role, and game context, it returns a list of all actions available to that user,
+ * including whether each action is enabled and why it might be disabled.
+ *
+ * @param state - Current game state
+ * @param role - User role (host or player)
+ * @param context - Game context (session info, player counts, settings, etc.)
+ * @returns Array of action descriptors with metadata for UI rendering
+ */
+export function getAvailableActions(
+  state: GameState,
+  role: Role,
+  context: GameContext
+): ActionDescriptor[] {
+  const actions: ActionDescriptor[] = [];
+
+  // Host Actions
+  if (role === 'host') {
+    switch (state) {
+      case 'lobby':
+        // Start game action
+        const minPlayers = context.allowSingleUser ? 0 : (context.allowHostToPlay ? 1 : GAME_CONFIG.MIN_PLAYERS);
+        const canStart = context.playerCount >= minPlayers && context.playerCount <= GAME_CONFIG.MAX_PLAYERS;
+
+        actions.push({
+          action: { type: 'start_game' },
+          label: 'Start Game',
+          description: `Begin the game with ${context.playerCount} player(s)`,
+          enabled: canStart,
+          disabledReason: canStart
+            ? undefined
+            : context.playerCount < minPlayers
+              ? `Need at least ${minPlayers} player(s) to start`
+              : `Maximum ${GAME_CONFIG.MAX_PLAYERS} players allowed`,
+          variant: 'primary',
+        });
+
+        // Update settings action (only in lobby)
+        actions.push({
+          action: { type: 'update_settings', settings: {} },
+          label: 'Game Settings',
+          description: 'Configure game options',
+          enabled: true,
+          variant: 'secondary',
+        });
+
+        // End game early action
+        actions.push({
+          action: { type: 'end_game' },
+          label: 'Cancel Game',
+          description: 'End the game without starting',
+          enabled: true,
+          variant: 'danger',
+        });
+        break;
+
+      case 'playing':
+        // Reveal answer (timeout case - no buzz)
+        actions.push({
+          action: { type: 'reveal_answer' },
+          label: 'Reveal Answer',
+          description: 'Show answer if time expires or no one buzzes',
+          enabled: true,
+          variant: 'secondary',
+        });
+
+        // End game action
+        actions.push({
+          action: { type: 'end_game' },
+          label: 'End Game',
+          description: 'Stop the game early',
+          enabled: true,
+          variant: 'danger',
+        });
+        break;
+
+      case 'buzzed':
+        // Judge correct
+        actions.push({
+          action: { type: 'judge_answer', correct: true },
+          label: 'Correct ✓',
+          description: 'Award points to the buzzer',
+          enabled: true,
+          variant: 'primary',
+        });
+
+        // Judge incorrect
+        actions.push({
+          action: { type: 'judge_answer', correct: false },
+          label: 'Incorrect ✗',
+          description: 'Deduct points from the buzzer',
+          enabled: true,
+          variant: 'danger',
+        });
+
+        // End game action
+        actions.push({
+          action: { type: 'end_game' },
+          label: 'End Game',
+          description: 'Stop the game early',
+          enabled: true,
+          variant: 'danger',
+        });
+        break;
+
+      case 'submitted':
+        // Finalize judgments (after all players submit in text mode)
+        actions.push({
+          action: { type: 'finalize_judgments', overrides: {} },
+          label: 'Finalize Answers',
+          description: 'Review and judge all submitted answers',
+          enabled: context.allPlayersSubmitted ?? false,
+          disabledReason: context.allPlayersSubmitted
+            ? undefined
+            : 'Waiting for all players to submit',
+          variant: 'primary',
+        });
+
+        // End game action
+        actions.push({
+          action: { type: 'end_game' },
+          label: 'End Game',
+          description: 'Stop the game early',
+          enabled: true,
+          variant: 'danger',
+        });
+        break;
+
+      case 'reveal':
+        // Advance to next round or finish game
+        const isLastRound = context.currentRound >= context.totalRounds;
+
+        actions.push({
+          action: { type: 'advance_round' },
+          label: isLastRound ? 'Finish Game' : 'Next Round',
+          description: isLastRound
+            ? 'View final results'
+            : `Proceed to round ${context.currentRound + 1}`,
+          enabled: true,
+          variant: 'primary',
+        });
+        break;
+
+      case 'finished':
+        // No actions in finished state (just display results)
+        // Could add "Play Again" or "Return to Lobby" actions here if needed
+        break;
+    }
+  }
+
+  // Player Actions
+  if (role === 'player') {
+    switch (state) {
+      case 'lobby':
+        // Join session action (only if not already joined)
+        if (!context.hasJoined) {
+          actions.push({
+            action: { type: 'join_session', playerName: '' },
+            label: 'Join Game',
+            description: 'Enter your name and join the game',
+            enabled: context.playerCount < GAME_CONFIG.MAX_PLAYERS,
+            disabledReason: context.playerCount >= GAME_CONFIG.MAX_PLAYERS
+              ? 'Game is full'
+              : undefined,
+            variant: 'primary',
+          });
+        }
+        break;
+
+      case 'playing':
+        // Buzz action
+        const alreadyBuzzed = context.hasPlayerBuzzed ?? false;
+        actions.push({
+          action: { type: 'buzz' },
+          label: 'Buzz In',
+          description: 'Signal that you know the answer',
+          enabled: !alreadyBuzzed,
+          disabledReason: alreadyBuzzed ? 'Someone already buzzed' : undefined,
+          variant: 'primary',
+        });
+
+        // Submit answer (if text input mode enabled)
+        if (context.enableTextInputMode) {
+          const hasSubmitted = context.hasCurrentPlayerSubmitted ?? false;
+          actions.push({
+            action: { type: 'submit_answer', answer: '' },
+            label: 'Submit Answer',
+            description: 'Type your answer',
+            enabled: !hasSubmitted,
+            disabledReason: hasSubmitted ? 'You already submitted' : undefined,
+            variant: 'primary',
+          });
+        }
+        break;
+
+      case 'buzzed':
+      case 'submitted':
+      case 'reveal':
+        // No actions for players in these states (just watch)
+        break;
+
+      case 'finished':
+        // No actions (game over)
+        // Could add "Play Again" action here if needed
+        break;
+    }
+  }
+
+  return actions;
+}

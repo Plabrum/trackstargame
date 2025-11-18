@@ -1,30 +1,38 @@
+/**
+ * Player Game View (Action-Based Refactor)
+ *
+ * Displays the game state and uses PlayerActionsPanel for all controls.
+ * All game logic is driven by the state machine.
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Music, Zap, Send } from "lucide-react";
+import { Music } from "lucide-react";
 import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
+import { PlayerActionsPanel } from "./PlayerActionsPanel";
 import type { Tables } from "@/lib/types/database";
 import type { RoundJudgment } from "@/hooks/usePlayer";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
+type GameRound = Tables<'game_rounds'>;
 
 interface PlayerGameViewProps {
   session: GameSession;
   players: Player[];
   currentPlayerId: string;
+  currentRound?: GameRound | null;
   currentTrack?: { title: string; artist: string } | null;
   buzzerPlayer?: Player | null;
   onBuzz: () => void;
   isBuzzing: boolean;
-  canBuzz: boolean;
   lastJudgment?: RoundJudgment | null;
+
   // Text input mode props
   onSubmitAnswer?: (answer: string) => void;
   isSubmittingAnswer?: boolean;
@@ -40,19 +48,19 @@ export function PlayerGameView({
   session,
   players,
   currentPlayerId,
+  currentRound,
   currentTrack,
   buzzerPlayer,
   onBuzz,
   isBuzzing,
-  canBuzz,
   lastJudgment,
   onSubmitAnswer,
   isSubmittingAnswer,
   hasSubmittedAnswer,
   answerFeedback,
 }: PlayerGameViewProps) {
-  const currentRound = session.current_round || 0;
-  const totalRounds = 10;
+  const currentRoundNum = session.current_round || 0;
+  const totalRounds = session.total_rounds;
   const state = session.state;
 
   // Sort players by score
@@ -66,9 +74,6 @@ export function PlayerGameView({
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
 
-  // Answer input state (text input mode)
-  const [answer, setAnswer] = useState('');
-
   // Trigger buzz animation when state changes to buzzed
   useEffect(() => {
     if (state === 'buzzed' && buzzerPlayer) {
@@ -78,102 +83,13 @@ export function PlayerGameView({
     }
   }, [state, buzzerPlayer]);
 
-  return (
-    <div className="container mx-auto p-6 max-w-2xl space-y-6">
-      {/* Buzz Animation Overlay */}
-      <BuzzAnimation
-        show={showBuzzAnimation}
-        playerName={buzzerPlayer?.name}
-        isCorrect={null}
-      />
-
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">Round {currentRound} / {totalRounds}</h1>
-        <div className="flex items-center justify-center gap-4">
-          <Badge variant="outline">
-            Your Score: <AnimatedScore score={currentPlayer?.score ?? 0} />
-          </Badge>
-          <Badge variant="secondary">
-            Rank: #{currentPlayerRank}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Buzz Button */}
-      <Card className="border-2">
-        <CardContent className="pt-6">
-          {/* Playing State - Show Buzz Button or Text Input */}
-          {state === 'playing' && !hasSubmittedAnswer && (
-            <div className="space-y-4">
-              <div className="text-center mb-4">
-                <Music className="h-12 w-12 mx-auto text-purple-500 animate-pulse" />
-                <p className="text-lg font-semibold mt-2">Listening...</p>
-                <p className="text-sm text-muted-foreground">
-                  {isTextInputMode
-                    ? "Type the artist/band name when you know it!"
-                    : "Buzz when you know the song!"}
-                </p>
-              </div>
-
-              {isTextInputMode ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (answer.trim() && onSubmitAnswer) {
-                      onSubmitAnswer(answer.trim());
-                      setAnswer('');
-                    }
-                  }}
-                  className="space-y-3"
-                >
-                  <Input
-                    type="text"
-                    placeholder="Enter artist/band name..."
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    disabled={isSubmittingAnswer}
-                    className="text-lg h-14"
-                    autoFocus
-                  />
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="w-full h-14 text-xl font-bold"
-                    disabled={!answer.trim() || isSubmittingAnswer}
-                  >
-                    {isSubmittingAnswer ? (
-                      "SUBMITTING..."
-                    ) : (
-                      <>
-                        <Send className="h-6 w-6 mr-2" />
-                        SUBMIT ANSWER
-                      </>
-                    )}
-                  </Button>
-                </form>
-              ) : (
-                <Button
-                  size="lg"
-                  className="w-full h-32 text-3xl font-bold bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 active:scale-95 transition-transform"
-                  onClick={onBuzz}
-                  disabled={!canBuzz || isBuzzing}
-                >
-                  {isBuzzing ? (
-                    "BUZZING..."
-                  ) : (
-                    <>
-                      <Zap className="h-10 w-10 mr-3" />
-                      BUZZ!
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Playing State - Answer Submitted (Text Input Mode) */}
-          {state === 'playing' && hasSubmittedAnswer && isTextInputMode && (
+  // Get state-specific information display
+  const renderStateInfo = () => {
+    switch (state) {
+      case 'playing':
+        // Show answer submitted message for text input mode
+        if (hasSubmittedAnswer && isTextInputMode) {
+          return (
             <Alert>
               <AlertDescription>
                 <div className="text-center py-4">
@@ -184,10 +100,12 @@ export function PlayerGameView({
                 </div>
               </AlertDescription>
             </Alert>
-          )}
+          );
+        }
 
-          {/* Submitted State - Show feedback for single player */}
-          {state === 'playing' && answerFeedback && (
+        // Show feedback for single player mode
+        if (answerFeedback) {
+          return (
             <Alert className={`border-2 ${
               answerFeedback.isCorrect
                 ? 'border-green-500 bg-green-50'
@@ -213,85 +131,164 @@ export function PlayerGameView({
                 </div>
               </AlertDescription>
             </Alert>
-          )}
+          );
+        }
 
-          {/* Buzzed State */}
-          {state === 'buzzed' && buzzerPlayer && (
-            <div className="text-center space-y-4">
-              {hasBuzzed ? (
-                <Alert className="border-green-500 bg-green-50">
-                  <AlertDescription>
-                    <div className="text-center py-4">
-                      <p className="text-2xl font-bold text-green-900">You buzzed first!</p>
-                      <p className="text-sm text-green-700 mt-2">
-                        Waiting for host to judge your answer...
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert>
-                  <AlertDescription>
-                    <div className="text-center py-4">
-                      <p className="text-xl font-bold">{buzzerPlayer.name} buzzed first!</p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Waiting for host to judge...
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
+        // Default playing state message
+        return (
+          <div className="text-center mb-4">
+            <Music className="h-12 w-12 mx-auto text-purple-500 animate-pulse" />
+            <p className="text-lg font-semibold mt-2">Listening...</p>
+            <p className="text-sm text-muted-foreground">
+              {isTextInputMode
+                ? "Type the artist/band name when you know it!"
+                : "Buzz when you know the song!"}
+            </p>
+          </div>
+        );
 
-          {/* Reveal State */}
-          {state === 'reveal' && currentTrack && (
-            <div className="space-y-4">
-              {/* Judgment Feedback - Show if this player was judged */}
-              {lastJudgment && lastJudgment.playerId === currentPlayerId && (
-                <Alert className={`border-2 ${
-                  lastJudgment.correct
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-red-500 bg-red-50'
-                }`}>
-                  <AlertDescription>
-                    <div className="text-center py-6">
-                      <p className={`text-4xl font-bold mb-2 ${
-                        lastJudgment.correct ? 'text-green-900' : 'text-red-900'
-                      }`}>
-                        {lastJudgment.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
-                      </p>
-                      <p className={`text-2xl font-semibold ${
-                        lastJudgment.correct ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {lastJudgment.pointsAwarded > 0 ? '+' : ''}{lastJudgment.pointsAwarded} points
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
+      case 'buzzed':
+        if (hasBuzzed) {
+          return (
+            <Alert className="border-green-500 bg-green-50">
+              <AlertDescription>
+                <div className="text-center py-4">
+                  <p className="text-2xl font-bold text-green-900">You buzzed first!</p>
+                  <p className="text-sm text-green-700 mt-2">
+                    Waiting for host to judge your answer...
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return (
+          <Alert>
+            <AlertDescription>
+              <div className="text-center py-4">
+                <p className="text-xl font-bold">{buzzerPlayer?.name} buzzed first!</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Waiting for host to judge...
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+        );
 
+      case 'submitted':
+        return (
+          <Alert>
+            <AlertDescription>
+              <div className="text-center py-4">
+                <p className="text-xl font-bold">Answers submitted!</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Waiting for host to review...
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+        );
+
+      case 'reveal':
+        return (
+          <div className="space-y-4">
+            {/* Judgment Feedback - Show if this player was judged */}
+            {lastJudgment && lastJudgment.playerId === currentPlayerId && (
+              <Alert className={`border-2 ${
+                lastJudgment.correct
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-red-500 bg-red-50'
+              }`}>
+                <AlertDescription>
+                  <div className="text-center py-6">
+                    <p className={`text-4xl font-bold mb-2 ${
+                      lastJudgment.correct ? 'text-green-900' : 'text-red-900'
+                    }`}>
+                      {lastJudgment.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
+                    </p>
+                    <p className={`text-2xl font-semibold ${
+                      lastJudgment.correct ? 'text-green-700' : 'text-red-700'
+                    }`}>
+                      {lastJudgment.pointsAwarded > 0 ? '+' : ''}{lastJudgment.pointsAwarded} points
+                    </p>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {currentTrack && (
               <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-2">Song Revealed</p>
                 <p className="text-2xl font-bold">{currentTrack.title}</p>
                 <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
               </div>
+            )}
 
-              {buzzerPlayer && (
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {hasBuzzed ? "You" : buzzerPlayer.name} buzzed first
-                  </p>
-                </div>
-              )}
+            {buzzerPlayer && (
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  {hasBuzzed ? "You" : buzzerPlayer.name} buzzed first
+                </p>
+              </div>
+            )}
 
-              <Alert>
-                <AlertDescription className="text-center">
-                  Waiting for next round...
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
+            <Alert>
+              <AlertDescription className="text-center">
+                Waiting for next round...
+              </AlertDescription>
+            </Alert>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-2xl space-y-6">
+      {/* Buzz Animation Overlay */}
+      <BuzzAnimation
+        show={showBuzzAnimation}
+        playerName={buzzerPlayer?.name}
+        isCorrect={null}
+      />
+
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold">Round {currentRoundNum} / {totalRounds}</h1>
+        <div className="flex items-center justify-center gap-4">
+          <Badge variant="outline">
+            Your Score: <AnimatedScore score={currentPlayer?.score ?? 0} />
+          </Badge>
+          <Badge variant="secondary">
+            Rank: #{currentPlayerRank}
+          </Badge>
+        </div>
+      </div>
+
+      {/* Main Game Area */}
+      <Card className="border-2">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* State Information Display */}
+            {renderStateInfo()}
+
+            {/* ACTION-BASED CONTROLS */}
+            {onSubmitAnswer && (
+              <PlayerActionsPanel
+                session={session}
+                players={players}
+                playerId={currentPlayerId}
+                currentRound={currentRound}
+                onBuzz={onBuzz}
+                onSubmitAnswer={onSubmitAnswer}
+                isBuzzing={isBuzzing}
+                isSubmittingAnswer={isSubmittingAnswer}
+                hasSubmittedAnswer={hasSubmittedAnswer}
+              />
+            )}
+          </div>
         </CardContent>
       </Card>
 

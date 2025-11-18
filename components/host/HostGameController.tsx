@@ -16,11 +16,13 @@ import type { UseSpotifyPlayerReturn } from "@/hooks/useSpotifyPlayer";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
+type GameRound = Tables<'game_rounds'>;
 
 interface HostGameControllerProps {
   session: GameSession;
   players: Player[];
   currentTrack?: { title: string; artist: string; spotify_id: string } | null;
+  currentRound?: GameRound | null;
   buzzerPlayer?: Player | null;
   elapsedSeconds?: number | null;
   onJudgeCorrect: () => void;
@@ -141,6 +143,7 @@ export function HostGameController(props: HostGameControllerProps) {
       {/* Main Game View */}
       <HostGameView
         {...props}
+        currentRound={props.currentRound}
         playbackState={playbackState}
         onPlayPause={() => {
           if (isPlaying) {

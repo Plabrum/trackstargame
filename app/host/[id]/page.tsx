@@ -231,6 +231,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       session={session}
       players={players}
       currentTrack={currentTrack}
+      currentRound={currentRound}
       buzzerPlayer={buzzerPlayer}
       elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
       onJudgeCorrect={() => {

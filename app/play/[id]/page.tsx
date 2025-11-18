@@ -197,11 +197,11 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       session={session}
       players={players}
       currentPlayerId={playerId}
+      currentRound={currentRound}
       currentTrack={currentTrack}
       buzzerPlayer={buzzerPlayer}
       onBuzz={buzz}
       isBuzzing={isBuzzing}
-      canBuzz={canBuzz}
       lastJudgment={lastJudgment}
       onSubmitAnswer={handleSubmitAnswer}
       isSubmittingAnswer={submitAnswer.isPending}
