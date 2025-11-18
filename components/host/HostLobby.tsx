@@ -267,7 +267,7 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
             {gameMode === 'solo' ? (
               <>
                 <p>Ready to test your music knowledge?</p>
-                <p>You'll type in artist names as songs play!</p>
+                <p>You&apos;ll type in artist names as songs play!</p>
               </>
             ) : (
               <>
