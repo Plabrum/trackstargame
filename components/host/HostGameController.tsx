@@ -56,20 +56,27 @@ export function HostGameController(props: HostGameControllerProps) {
 
   // Auto-play track when round starts
   useEffect(() => {
+    console.log('[HostGameController] Auto-play effect:', {
+      state: props.session.state,
+      hasSpotifyId: !!currentSpotifyId,
+      isReady,
+      hasStarted: hasStartedPlayingRef.current
+    });
+
     if (
       props.session.state === 'playing' &&
       currentSpotifyId &&
       isReady &&
       !hasStartedPlayingRef.current
     ) {
-      console.log('Auto-playing track:', currentSpotifyId);
+      console.log('[HostGameController] Auto-playing track:', currentSpotifyId);
       play(currentSpotifyId)
         .then(() => {
-          console.log('Successfully started playback');
+          console.log('[HostGameController] Successfully started playback');
           hasStartedPlayingRef.current = true;
         })
         .catch((err) => {
-          console.error('Failed to auto-play:', err);
+          console.error('[HostGameController] Failed to auto-play:', err);
         });
     }
   }, [props.session.state, currentSpotifyId, isReady, play]);
