@@ -9,13 +9,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
 import { PackCard } from "./PackCard";
 import { PackSongsSheet } from "./PackSongsSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { useGetApiPacks } from "@/lib/api/packs/packs";
+import { usePostApiSessions } from "@/lib/api/sessions/sessions";
 import type { GetApiPacks200Item } from "@/lib/api/model";
 
 export function PackGallery() {
@@ -31,33 +31,19 @@ export function PackGallery() {
 
   const packs = packsResponse?.data;
 
-  // Create session mutation
-  const createSession = useMutation({
-    mutationFn: async (packId: string) => {
-      const response = await fetch('/api/session/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ packId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create session');
-      }
-
-      const data = await response.json();
-      return data.sessionId;
-    },
-    onSuccess: (sessionId) => {
-      // Redirect to host lobby
-      router.push(`/host/${sessionId}`);
-    },
-    onError: (error: Error) => {
-      console.error('Failed to create session:', error);
-      setStartingPackId(null);
+  // Create session mutation using orval-generated hook
+  const createSession = usePostApiSessions({
+    mutation: {
+      onSuccess: (response) => {
+        // Check if response is successful (status 200)
+        if (response.status === 200) {
+          router.push(`/host/${response.data.id}`);
+        }
+      },
+      onError: (error) => {
+        console.error('Failed to create session:', error);
+        setStartingPackId(null);
+      },
     },
   });
 
@@ -68,7 +54,7 @@ export function PackGallery() {
 
   const handleStartGame = (packId: string) => {
     setStartingPackId(packId);
-    createSession.mutate(packId);
+    createSession.mutate({ data: { packId } });
   };
 
   if (isLoading) {
@@ -137,7 +123,7 @@ export function PackGallery() {
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              {createSession.error?.message || 'Failed to create game session'}
+              Failed to create game session
             </AlertDescription>
           </Alert>
         </div>
