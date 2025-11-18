@@ -89,7 +89,6 @@
                       "type": "string",
                       "enum": [
                         "lobby",
-                        "ready",
                         "playing",
                         "buzzed",
                         "reveal",

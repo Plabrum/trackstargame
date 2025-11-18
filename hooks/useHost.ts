@@ -6,64 +6,38 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useGameChannel, type GameEventHandlers } from './useGameChannel';
 import { useStartGame, useJudgeAnswer } from './mutations/use-game-mutations';
 
 /**
- * Start a new round (host only).
- */
-export function useStartRound() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/game/${sessionId}/start-round`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to start round');
-      }
-
-      return response.json();
-    },
-    onSuccess: (data, sessionId) => {
-      // Invalidate game state and rounds
-      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
-      queryClient.invalidateQueries({
-        queryKey: ['game_sessions', sessionId, 'rounds'],
-      });
-      // Return data is automatically passed through by mutateAsync
-    },
-  });
-}
-
-/**
  * Advance to next round or finish game (host only).
+ * POST /api/sessions/[id]/rounds
+ *
+ * This will automatically start the new round (no separate start action needed).
  */
 export function useNextRound() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/game/${sessionId}/next-round`, {
+      const response = await fetch(`/api/sessions/${sessionId}/rounds`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to advance round');
+        throw new Error(error.error || error.message || 'Failed to advance round');
       }
 
       return response.json();
     },
     onSuccess: (_, sessionId) => {
       // Invalidate game state and rounds (to fetch new track)
-      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
       queryClient.invalidateQueries({
-        queryKey: ['game_sessions', sessionId, 'rounds'],
+        queryKey: ['sessions', sessionId, 'rounds'],
       });
     },
   });
@@ -71,14 +45,17 @@ export function useNextRound() {
 
 /**
  * Reveal track without buzzing (timeout/skip).
+ * PATCH /api/sessions/[id]/rounds/current with action: reveal
  */
 export function useRevealTrack() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/game/${sessionId}/reveal`, {
-        method: 'POST',
+      const response = await fetch(`/api/sessions/${sessionId}/rounds/current`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reveal' }),
       });
 
       if (!response.ok) {
@@ -90,21 +67,24 @@ export function useRevealTrack() {
     },
     onSuccess: (_, sessionId) => {
       // Invalidate game state
-      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
   });
 }
 
 /**
  * End the game early (host only).
+ * PATCH /api/sessions/[id] with action: end
  */
 export function useEndGame() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/game/${sessionId}/end`, {
-        method: 'POST',
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
       });
 
       if (!response.ok) {
@@ -116,8 +96,8 @@ export function useEndGame() {
     },
     onSuccess: (_, sessionId) => {
       // Invalidate game state and players
-      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['game_sessions', sessionId, 'players'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId, 'players'] });
     },
   });
 }
@@ -138,95 +118,103 @@ export function useHost(
 
   // Mutations
   const startGame = useStartGame();
-  const startRound = useStartRound();
   const judgeAnswer = useJudgeAnswer();
   const nextRound = useNextRound();
   const revealTrack = useRevealTrack();
   const endGame = useEndGame();
 
   // Default event handlers that invalidate queries
-  const defaultHandlers: GameEventHandlers = {
-    onPlayerJoined: useCallback(() => {
+  const defaultHandlers: GameEventHandlers = useMemo(() => ({
+    onPlayerJoined: () => {
+      console.log('[useHost] onPlayerJoined - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onPlayerLeft: useCallback(() => {
+    onPlayerLeft: () => {
+      console.log('[useHost] onPlayerLeft - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onGameStarted: useCallback(() => {
+    onGameStarted: () => {
+      console.log('[useHost] onGameStarted - invalidating session query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onRoundStart: useCallback(() => {
+    onRoundStart: () => {
+      console.log('[useHost] onRoundStart - invalidating session and rounds queries');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'rounds'],
+          queryKey: ['sessions', sessionId, 'rounds'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onBuzz: useCallback(() => {
+    onBuzz: () => {
+      console.log('[useHost] onBuzz - invalidating session query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onRoundResult: useCallback(() => {
+    onRoundResult: () => {
+      console.log('[useHost] onRoundResult - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onReveal: useCallback(() => {
+    onReveal: () => {
+      console.log('[useHost] onReveal - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onStateChange: useCallback(() => {
+    onStateChange: () => {
+      console.log('[useHost] onStateChange - invalidating session query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onGameEnd: useCallback(() => {
+    onGameEnd: () => {
+      console.log('[useHost] onGameEnd - invalidating session and players queries');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
-  };
+    },
+  }), [sessionId, queryClient]);
 
   // Merge default handlers with custom handlers
-  const mergedHandlers: GameEventHandlers = {
+  const mergedHandlers: GameEventHandlers = useMemo(() => ({
     onPlayerJoined: (event) => {
       defaultHandlers.onPlayerJoined?.(event);
       eventHandlers?.onPlayerJoined?.(event);
@@ -263,7 +251,7 @@ export function useHost(
       defaultHandlers.onGameEnd?.(event);
       eventHandlers?.onGameEnd?.(event);
     },
-  };
+  }), [defaultHandlers, eventHandlers]);
 
   // Subscribe to game channel
   useGameChannel(sessionId, mergedHandlers);
@@ -276,14 +264,6 @@ export function useHost(
         return startGame.mutate(sessionId);
       },
       [sessionId, startGame]
-    ),
-
-    startRound: useCallback(
-      () => {
-        if (!sessionId) throw new Error('No session ID');
-        return startRound.mutateAsync(sessionId);
-      },
-      [sessionId, startRound]
     ),
 
     judgeAnswer: useCallback(
@@ -320,7 +300,6 @@ export function useHost(
 
     // Mutation states
     isStartingGame: startGame.isPending,
-    isStartingRound: startRound.isPending,
     isJudging: judgeAnswer.isPending,
     isAdvancing: nextRound.isPending,
     isRevealing: revealTrack.isPending,

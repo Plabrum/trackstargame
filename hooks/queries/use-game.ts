@@ -34,6 +34,7 @@ export function useGameSession(sessionId: string | null) {
       return response.json() as Promise<GameSession>;
     },
     enabled: !!sessionId,
+    staleTime: 0, // Always consider data stale for immediate updates
   });
 
   // Subscribe to real-time updates
@@ -86,6 +87,8 @@ export function useGamePlayers(sessionId: string | null) {
       return response.json() as Promise<Player[]>;
     },
     enabled: !!sessionId,
+    staleTime: 0, // Always consider data stale for immediate updates
+    refetchOnMount: true, // Refetch when component mounts
   });
 
   // Subscribe to real-time updates
@@ -140,6 +143,7 @@ export function useGameRounds(sessionId: string | null) {
       return response.json() as Promise<GameRound[]>;
     },
     enabled: !!sessionId,
+    staleTime: 0, // Always consider data stale for immediate updates
   });
 
   // Subscribe to real-time updates

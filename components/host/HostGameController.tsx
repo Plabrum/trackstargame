@@ -23,13 +23,11 @@ interface HostGameControllerProps {
   currentTrack?: { title: string; artist: string; spotify_id: string } | null;
   buzzerPlayer?: Player | null;
   elapsedSeconds?: number | null;
-  onStartRound: () => Promise<any>;
   onJudgeCorrect: () => void;
   onJudgeIncorrect: () => void;
   onNextRound: () => void;
   onRevealTrack: () => void;
   onEndGame: () => void;
-  isStartingRound: boolean;
   isJudging: boolean;
   isAdvancing: boolean;
   isRevealing: boolean;
@@ -93,26 +91,6 @@ export function HostGameController(props: HostGameControllerProps) {
     }
   }, [props.session.state]);
 
-  // Wrapped startRound that calls the original and starts playback
-  const handleStartRound = async () => {
-    hasStartedPlayingRef.current = false; // Reset flag to allow auto-play
-    const result = await props.onStartRound();
-
-    // Immediately start playing the track if we got spotify_id back
-    if (result?.spotify_id && isReady) {
-      console.log('Starting playback immediately after round start:', result.spotify_id);
-      play(result.spotify_id)
-        .then(() => {
-          console.log('Successfully started playback');
-          hasStartedPlayingRef.current = true;
-        })
-        .catch((err) => {
-          console.error('Failed to start playback:', err);
-          // Don't set the flag so auto-play effect can retry
-        });
-    }
-  };
-
   return (
     <div>
       {/* Spotify Player Status */}
@@ -146,7 +124,6 @@ export function HostGameController(props: HostGameControllerProps) {
       {/* Main Game View */}
       <HostGameView
         {...props}
-        onStartRound={handleStartRound}
         playbackState={playbackState}
         onPlayPause={() => {
           if (isPlaying) {

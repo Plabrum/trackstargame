@@ -2,12 +2,12 @@
  * Current Round API
  *
  * GET   /api/sessions/[id]/rounds/current - Get current round
- * PATCH /api/sessions/[id]/rounds/current - Update current round (start, judge, reveal)
+ * PATCH /api/sessions/[id]/rounds/current - Update current round (judge, reveal)
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getNextGameState, enforceRoundStartRules, enforceJudgeRules, StateTransitionError, GameRuleError } from '@/lib/api/state-machine-middleware';
+import { getNextGameState, enforceJudgeRules, StateTransitionError, GameRuleError } from '@/lib/api/state-machine-middleware';
 import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
 import { validateGameState, calculatePoints } from '@/lib/game/state-machine';
 
@@ -68,7 +68,6 @@ export async function GET(
  * Update current round state
  *
  * Actions:
- * - "start": Start the round (set round_start_time)
  * - "judge": Judge the answer (correct: boolean)
  * - "reveal": Reveal the track
  */
@@ -100,66 +99,6 @@ export async function PATCH(
     const currentState = validateGameState(session.state);
 
     switch (action) {
-      case 'start': {
-        try {
-          // Enforce game rules
-          enforceRoundStartRules(session);
-
-          // Get next state through state machine
-          const nextState = getNextGameState(currentState, 'start_round');
-
-          // Get current round to get track ID
-          const currentRoundNum = session.current_round || 0;
-          const { data: round } = await supabase
-            .from('game_rounds')
-            .select('track_id')
-            .eq('session_id', sessionId)
-            .eq('round_number', currentRoundNum)
-            .single();
-
-          // Start the current round
-          const { error: updateError } = await supabase
-            .from('game_sessions')
-            .update({
-              round_start_time: new Date().toISOString(),
-              state: nextState,
-            })
-            .eq('id', sessionId);
-
-          if (updateError) {
-            return NextResponse.json(
-              { error: updateError.message },
-              { status: 500 }
-            );
-          }
-
-          // Broadcast round start event
-          if (round?.track_id) {
-            await broadcastGameEvent(sessionId, {
-              type: 'round_start',
-              roundNumber: currentRoundNum,
-              trackId: round.track_id,
-            });
-          }
-
-          await broadcastStateChange(sessionId, nextState);
-
-          // Return updated session
-          const { data: updatedSession } = await supabase
-            .from('game_sessions')
-            .select('*')
-            .eq('id', sessionId)
-            .single();
-
-          return NextResponse.json(updatedSession);
-        } catch (error) {
-          if (error instanceof StateTransitionError || error instanceof GameRuleError) {
-            return NextResponse.json({ error: error.message }, { status: 400 });
-          }
-          throw error;
-        }
-      }
-
       case 'judge': {
         const { correct } = body;
 
@@ -194,12 +133,16 @@ export async function PATCH(
           const elapsedSeconds = Number(round.elapsed_seconds) || 0;
           const pointsAwarded = calculatePoints(elapsedSeconds, correct);
 
+          console.log('[Judge] Elapsed seconds:', elapsedSeconds);
+          console.log('[Judge] Points awarded:', pointsAwarded);
+          console.log('[Judge] Correct:', correct);
+
           // Update round with judgement (fixed field name: correct not was_correct)
           await supabase
             .from('game_rounds')
             .update({
               correct: correct,
-              points_awarded: pointsAwarded,
+              points_awarded: Math.round(pointsAwarded),
             })
             .eq('session_id', sessionId)
             .eq('round_number', judgeRoundNum);
@@ -211,13 +154,23 @@ export async function PATCH(
             .eq('id', round.buzzer_player_id)
             .single();
 
+          console.log('[Judge] Current player score:', player?.score);
+          console.log('[Judge] New score will be:', (player?.score ?? 0) + pointsAwarded);
+
           if (player) {
-            await supabase
+            const newScore = Math.round((player.score ?? 0) + pointsAwarded);
+            const { error: scoreUpdateError } = await supabase
               .from('players')
               .update({
-                score: (player.score || 0) + pointsAwarded,
+                score: newScore,
               })
               .eq('id', round.buzzer_player_id);
+
+            if (scoreUpdateError) {
+              console.error('[Judge] Error updating score:', scoreUpdateError);
+            } else {
+              console.log('[Judge] Score updated successfully to:', newScore);
+            }
           }
 
           // Get next state through state machine
@@ -234,7 +187,7 @@ export async function PATCH(
             type: 'round_result',
             playerId: round.buzzer_player_id,
             correct,
-            pointsAwarded,
+            pointsAwarded: Math.round(pointsAwarded),
           });
 
           await broadcastStateChange(sessionId, nextState);
@@ -288,7 +241,7 @@ export async function PATCH(
             const leaderboard = (players || []).map(p => ({
               playerId: p.id,
               playerName: p.name,
-              score: p.score || 0,
+              score: p.score ?? 0,
             }));
 
             await broadcastGameEvent(sessionId, {
@@ -321,7 +274,7 @@ export async function PATCH(
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use "start", "judge", or "reveal"' },
+          { error: 'Invalid action. Use "judge" or "reveal"' },
           { status: 400 }
         );
     }

@@ -45,42 +45,73 @@ export function useGameChannel(
 
     const supabase = createClient();
     const channelName = getGameChannelName(sessionId);
-    const channel = supabase.channel(channelName);
+    console.log('[useGameChannel] Subscribing to channel:', channelName);
+    console.log('[useGameChannel] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+    const channel = supabase.channel(channelName, {
+      config: {
+        broadcast: { self: true }, // Receive our own broadcasts for testing
+      },
+    });
 
     // Subscribe to all broadcast events
     channel
       .on('broadcast', { event: 'player_joined' }, ({ payload }) => {
+        console.log('[useGameChannel] Received player_joined:', payload);
         handlersRef.current.onPlayerJoined?.(payload as Extract<GameEvent, { type: 'player_joined' }>);
       })
       .on('broadcast', { event: 'player_left' }, ({ payload }) => {
+        console.log('[useGameChannel] Received player_left:', payload);
         handlersRef.current.onPlayerLeft?.(payload as Extract<GameEvent, { type: 'player_left' }>);
       })
       .on('broadcast', { event: 'game_started' }, ({ payload }) => {
+        console.log('[useGameChannel] Received game_started:', payload);
         handlersRef.current.onGameStarted?.(payload as Extract<GameEvent, { type: 'game_started' }>);
       })
       .on('broadcast', { event: 'round_start' }, ({ payload }) => {
+        console.log('[useGameChannel] Received round_start:', payload);
         handlersRef.current.onRoundStart?.(payload as Extract<GameEvent, { type: 'round_start' }>);
       })
       .on('broadcast', { event: 'buzz' }, ({ payload }) => {
+        console.log('[useGameChannel] Received buzz:', payload);
         handlersRef.current.onBuzz?.(payload as Extract<GameEvent, { type: 'buzz' }>);
       })
       .on('broadcast', { event: 'round_result' }, ({ payload }) => {
+        console.log('[useGameChannel] Received round_result:', payload);
         handlersRef.current.onRoundResult?.(payload as Extract<GameEvent, { type: 'round_result' }>);
       })
       .on('broadcast', { event: 'reveal' }, ({ payload }) => {
+        console.log('[useGameChannel] Received reveal:', payload);
         handlersRef.current.onReveal?.(payload as Extract<GameEvent, { type: 'reveal' }>);
       })
       .on('broadcast', { event: 'state_change' }, ({ payload }) => {
+        console.log('[useGameChannel] Received state_change:', payload);
         handlersRef.current.onStateChange?.(payload as Extract<GameEvent, { type: 'state_change' }>);
       })
       .on('broadcast', { event: 'game_end' }, ({ payload }) => {
+        console.log('[useGameChannel] Received game_end:', payload);
         handlersRef.current.onGameEnd?.(payload as Extract<GameEvent, { type: 'game_end' }>);
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[useGameChannel] Subscription status:', status, 'for channel:', channelName);
+        if (err) {
+          console.error('[useGameChannel] Subscription error:', err);
+        }
+        if (status === 'SUBSCRIBED') {
+          console.log('[useGameChannel] Successfully subscribed to channel:', channelName);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[useGameChannel] Channel error for:', channelName);
+        } else if (status === 'TIMED_OUT') {
+          console.error('[useGameChannel] Subscription timed out for:', channelName);
+        } else if (status === 'CLOSED') {
+          console.log('[useGameChannel] Channel closed:', channelName);
+        }
+      });
 
     channelRef.current = channel;
 
     return () => {
+      console.log('[useGameChannel] Unsubscribing from channel:', channelName);
       channel.unsubscribe();
       channelRef.current = null;
     };

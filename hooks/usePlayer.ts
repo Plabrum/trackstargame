@@ -4,10 +4,16 @@
  * Provides player controls (buzzing) and subscribes to game events.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGameChannel, type GameEventHandlers } from './useGameChannel';
 import { useBuzz } from './mutations/use-game-mutations';
+
+export type RoundJudgment = {
+  playerId: string;
+  correct: boolean;
+  pointsAwarded: number;
+};
 
 /**
  * Hook for player controls and real-time updates.
@@ -25,90 +31,110 @@ export function usePlayer(
 ) {
   const queryClient = useQueryClient();
   const buzz = useBuzz();
+  const [lastJudgment, setLastJudgment] = useState<RoundJudgment | null>(null);
 
   // Default event handlers that invalidate queries
-  const defaultHandlers: GameEventHandlers = {
-    onPlayerJoined: useCallback(() => {
+  const defaultHandlers: GameEventHandlers = useMemo(() => ({
+    onPlayerJoined: () => {
+      console.log('[usePlayer] onPlayerJoined - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onPlayerLeft: useCallback(() => {
+    onPlayerLeft: () => {
+      console.log('[usePlayer] onPlayerLeft - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onGameStarted: useCallback(() => {
+    onGameStarted: () => {
+      console.log('[usePlayer] onGameStarted - invalidating session query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onRoundStart: useCallback(() => {
+    onRoundStart: () => {
+      console.log('[usePlayer] onRoundStart - invalidating session and rounds queries');
+      // Clear judgment from previous round
+      setLastJudgment(null);
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'rounds'],
+          queryKey: ['sessions', sessionId, 'rounds'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onBuzz: useCallback(() => {
+    onBuzz: () => {
+      console.log('[usePlayer] onBuzz - invalidating session query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onRoundResult: useCallback(() => {
-      if (sessionId) {
-        queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+    onRoundResult: (event) => {
+      console.log('[usePlayer] onRoundResult - invalidating players query');
+      // Capture the judgment result for visual feedback
+      if (event.type === 'round_result') {
+        setLastJudgment({
+          playerId: event.playerId,
+          correct: event.correct,
+          pointsAwarded: event.pointsAwarded,
         });
       }
-    }, [sessionId, queryClient]),
+      if (sessionId) {
+        queryClient.invalidateQueries({
+          queryKey: ['sessions', sessionId, 'players'],
+        });
+      }
+    },
 
-    onReveal: useCallback(() => {
+    onReveal: () => {
+      console.log('[usePlayer] onReveal - invalidating players query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onStateChange: useCallback(() => {
+    onStateChange: () => {
+      console.log('[usePlayer] onStateChange - invalidating session query');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
       }
-    }, [sessionId, queryClient]),
+    },
 
-    onGameEnd: useCallback(() => {
+    onGameEnd: () => {
+      console.log('[usePlayer] onGameEnd - invalidating session and players queries');
       if (sessionId) {
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId],
+          queryKey: ['sessions', sessionId],
         });
         queryClient.invalidateQueries({
-          queryKey: ['game_sessions', sessionId, 'players'],
+          queryKey: ['sessions', sessionId, 'players'],
         });
       }
-    }, [sessionId, queryClient]),
-  };
+    },
+  }), [sessionId, queryClient]);
 
   // Merge default handlers with custom handlers
-  const mergedHandlers: GameEventHandlers = {
+  const mergedHandlers: GameEventHandlers = useMemo(() => ({
     onPlayerJoined: (event) => {
       defaultHandlers.onPlayerJoined?.(event);
       eventHandlers?.onPlayerJoined?.(event);
@@ -145,7 +171,7 @@ export function usePlayer(
       defaultHandlers.onGameEnd?.(event);
       eventHandlers?.onGameEnd?.(event);
     },
-  };
+  }), [defaultHandlers, eventHandlers]);
 
   // Subscribe to game channel
   useGameChannel(sessionId, mergedHandlers);
@@ -163,5 +189,8 @@ export function usePlayer(
     isBuzzing: buzz.isPending,
     buzzError: buzz.error,
     buzzSuccess: buzz.isSuccess,
+
+    // Round judgment result (for visual feedback)
+    lastJudgment,
   };
 }

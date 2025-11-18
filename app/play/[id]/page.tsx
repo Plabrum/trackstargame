@@ -55,33 +55,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   const joinSession = useJoinSession();
 
   // Player controls
-  const { buzz, isBuzzing } = usePlayer(id, playerId, {
-    onBuzz: (event) => {
-      if (event.playerId === playerId) {
-        toast({
-          title: "You buzzed!",
-          description: `Time: ${event.elapsedSeconds?.toFixed(2)}s`,
-        });
-      } else {
-        toast({
-          title: "Buzz!",
-          description: `${event.playerName} buzzed first`,
-        });
-      }
-    },
-    onReveal: (event) => {
-      toast({
-        title: "Track Revealed",
-        description: `${event.track.title} by ${event.track.artist}`,
-      });
-    },
-    onGameEnd: () => {
-      toast({
-        title: "Game Over!",
-        description: "All rounds completed",
-      });
-    },
-  });
+  const { buzz, isBuzzing, lastJudgment } = usePlayer(id, playerId);
 
   const handleJoin = (playerName: string) => {
     joinSession.mutate(
@@ -90,10 +64,6 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
         onSuccess: (newPlayerId) => {
           setPlayerId(newPlayerId);
           localStorage.setItem(`player_${id}`, newPlayerId);
-          toast({
-            title: "Joined!",
-            description: "You've successfully joined the game",
-          });
         },
         onError: (error) => {
           toast({
@@ -192,6 +162,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       onBuzz={buzz}
       isBuzzing={isBuzzing}
       canBuzz={canBuzz}
+      lastJudgment={lastJudgment}
     />
   );
 }

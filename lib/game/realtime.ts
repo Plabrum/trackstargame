@@ -28,6 +28,8 @@ export async function broadcastGameEvent(
   const channelName = getGameChannelName(sessionId);
   const channel = supabase.channel(channelName);
 
+  console.log('[broadcastGameEvent] Broadcasting to channel:', channelName, 'event:', event.type);
+
   // Use httpSend for REST API delivery (recommended approach)
   // This sends the message via REST without requiring a WebSocket subscription
   const response = await fetch(
@@ -52,8 +54,12 @@ export async function broadcastGameEvent(
   );
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[broadcastGameEvent] Broadcast failed:', response.status, errorText);
     throw new Error(`Failed to broadcast message: ${response.statusText}`);
   }
+
+  console.log('[broadcastGameEvent] Broadcast successful');
 }
 
 /**

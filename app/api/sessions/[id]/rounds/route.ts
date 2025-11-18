@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getNextGameState, enforceNextRoundRules, StateTransitionError, GameRuleError } from '@/lib/api/state-machine-middleware';
-import { broadcastStateChange } from '@/lib/game/realtime';
+import { broadcastGameEvent, broadcastStateChange } from '@/lib/game/realtime';
 import { validateGameState, GAME_CONFIG } from '@/lib/game/state-machine';
 
 /**
@@ -60,7 +60,7 @@ export async function POST(
     // Get current session state
     const { data: session, error: sessionError } = await supabase
       .from('game_sessions')
-      .select('current_round, pack_id, state')
+      .select('current_round, pack_id, state, total_rounds')
       .eq('id', sessionId)
       .single();
 
@@ -82,6 +82,7 @@ export async function POST(
       const nextState = getNextGameState(currentState, 'next_round', {
         currentRound: session.current_round || 0,
         nextRound,
+        totalRounds: session.total_rounds,
       });
 
       // If next state is finished, update and return
@@ -174,13 +175,13 @@ export async function POST(
       );
     }
 
-    // Update session to next round and set state to ready
+    // Update session to next round and set state to playing (auto-start)
     const { data: updatedSession, error: updateError } = await supabase
       .from('game_sessions')
       .update({
         current_round: nextRound,
-        state: 'ready',
-        round_start_time: null,
+        state: 'playing',
+        round_start_time: new Date().toISOString(),
       })
       .eq('id', sessionId)
       .select()
@@ -193,8 +194,15 @@ export async function POST(
       );
     }
 
-    // Broadcast state change to ready
-    await broadcastStateChange(sessionId, 'ready');
+    // Broadcast round start event
+    await broadcastGameEvent(sessionId, {
+      type: 'round_start',
+      roundNumber: nextRound,
+      trackId: randomTrack.id,
+    });
+
+    // Broadcast state change to playing
+    await broadcastStateChange(sessionId, 'playing');
 
     return NextResponse.json(updatedSession);
   } catch (error) {

@@ -6,25 +6,38 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Users } from "lucide-react";
+import { Copy, Users, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
+type GameSession = Tables<'game_sessions'>;
 
 interface HostLobbyProps {
-  sessionId: string;
-  hostName: string;
+  session: GameSession;
   players: Player[];
   onStartGame: () => void;
   isStarting: boolean;
 }
 
-export function HostLobby({ sessionId, hostName, players, onStartGame, isStarting }: HostLobbyProps) {
+export function HostLobby({ session, players, onStartGame, isStarting }: HostLobbyProps) {
   const { toast } = useToast();
+  const router = useRouter();
+  const sessionId = session.id;
+  const hostName = session.host_name;
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/play/${sessionId}` : "";
-  const minPlayers = 2;
+
+  // Determine min/max players based on settings
   const maxPlayers = 10;
+  let minPlayers = 2;
+
+  if (session.allow_single_user) {
+    minPlayers = 0; // Allow solo play
+  } else if (session.allow_host_to_play) {
+    minPlayers = 1; // Host counts as 1, need at least 1 other player
+  }
+
   const canStart = players.length >= minPlayers && players.length <= maxPlayers;
 
   const handleCopyCode = () => {
@@ -50,6 +63,41 @@ export function HostLobby({ sessionId, hostName, players, onStartGame, isStartin
         <h1 className="text-4xl font-bold">Game Lobby</h1>
         <p className="text-muted-foreground">Host: {hostName}</p>
       </div>
+
+      {/* Game Settings Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Game Settings
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/host/${sessionId}/settings`)}
+            >
+              Edit Settings
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Rounds</p>
+              <p className="text-2xl font-bold">{session.total_rounds}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Host Playing</p>
+              <p className="text-2xl font-bold">{session.allow_host_to_play ? "✓" : "✗"}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Solo Mode</p>
+              <p className="text-2xl font-bold">{session.allow_single_user ? "✓" : "✗"}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* QR Code & Game Code */}
@@ -146,7 +194,11 @@ export function HostLobby({ sessionId, hostName, players, onStartGame, isStartin
             <Alert className="mb-4">
               <AlertDescription>
                 {players.length < minPlayers
-                  ? `Need at least ${minPlayers} players to start (currently ${players.length})`
+                  ? session.allow_single_user
+                    ? `Waiting for players (currently ${players.length}). Solo mode enabled, you can start anytime!`
+                    : session.allow_host_to_play
+                    ? `Need at least ${minPlayers} other player to join (currently ${players.length})`
+                    : `Need at least ${minPlayers} players to start (currently ${players.length})`
                   : `Too many players! Maximum is ${maxPlayers} (currently ${players.length})`}
               </AlertDescription>
             </Alert>

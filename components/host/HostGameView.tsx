@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, XCircle, Play, Music } from "lucide-react";
+import { CheckCircle2, XCircle, Music } from "lucide-react";
 import { BuzzAnimation } from "@/components/game/BuzzAnimation";
 import { AnimatedScore } from "@/components/game/ScoreAnimation";
 import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
@@ -22,13 +22,11 @@ interface HostGameViewProps {
   currentTrack?: { title: string; artist: string } | null;
   buzzerPlayer?: Player | null;
   elapsedSeconds?: number | null;
-  onStartRound: () => void;
   onJudgeCorrect: () => void;
   onJudgeIncorrect: () => void;
   onNextRound: () => void;
   onRevealTrack?: () => void;
   onEndGame?: () => void;
-  isStartingRound: boolean;
   isJudging: boolean;
   isAdvancing: boolean;
   isRevealing?: boolean;
@@ -46,13 +44,11 @@ export function HostGameView({
   currentTrack,
   buzzerPlayer,
   elapsedSeconds,
-  onStartRound,
   onJudgeCorrect,
   onJudgeIncorrect,
   onNextRound,
   onRevealTrack,
   onEndGame,
-  isStartingRound,
   isJudging,
   isAdvancing,
   isRevealing,
@@ -63,11 +59,11 @@ export function HostGameView({
   isSpotifyReady,
 }: HostGameViewProps) {
   const currentRound = session.current_round || 0;
-  const totalRounds = 10;
+  const totalRounds = session.total_rounds;
   const state = session.state;
 
   // Sort players by score
-  const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
@@ -221,19 +217,6 @@ export function HostGameView({
                 </div>
               )}
 
-              {/* Before Starting Round 1 - show when in playing state but round hasn't started yet */}
-              {state === 'playing' && !session.round_start_time && (
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={onStartRound}
-                  disabled={isStartingRound}
-                >
-                  <Play className="h-5 w-5 mr-2" />
-                  {isStartingRound ? "Starting..." : "Start Round"}
-                </Button>
-              )}
-
             </CardContent>
           </Card>
 
@@ -311,7 +294,7 @@ export function HostGameView({
                       </span>
                     </div>
                     <span className={`font-bold ${index === 0 ? 'text-lg' : ''}`}>
-                      <AnimatedScore score={player.score || 0} />
+                      <AnimatedScore score={player.score ?? 0} />
                     </span>
                   </div>
                 ))}

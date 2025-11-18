@@ -292,3 +292,42 @@ export function useEndGame() {
     },
   });
 }
+
+/**
+ * Update game settings
+ *
+ * PATCH /api/sessions/[id] { action: "settings", ... }
+ */
+export function useUpdateSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      sessionId: string;
+      allowHostToPlay: boolean;
+      allowSingleUser: boolean;
+      totalRounds: number;
+    }) => {
+      const response = await fetch(`/api/sessions/${params.sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'settings',
+          allowHostToPlay: params.allowHostToPlay,
+          allowSingleUser: params.allowSingleUser,
+          totalRounds: params.totalRounds,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update settings');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', variables.sessionId] });
+    },
+  });
+}

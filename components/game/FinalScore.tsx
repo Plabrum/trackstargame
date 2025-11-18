@@ -18,7 +18,7 @@ interface FinalScoreProps {
 
 export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: FinalScoreProps) {
   // Sort players by score
-  const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const winner = sortedPlayers[0];
   const topThree = sortedPlayers.slice(0, 3);
 
@@ -41,7 +41,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
               <p className="text-sm text-muted-foreground mb-1">Winner</p>
               <p className="text-4xl font-bold">{winner?.name || 'No Winner'}</p>
               <p className="text-2xl text-yellow-600 font-semibold mt-2">
-                {winner?.score || 0} points
+                {winner?.score ?? 0} points
               </p>
             </div>
           </div>
@@ -76,7 +76,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
                       <p className="text-sm text-muted-foreground">#{index + 1}</p>
                       <p className="text-xl font-bold">{player.name}</p>
                       <p className="text-lg font-semibold text-muted-foreground">
-                        {player.score || 0} points
+                        {player.score ?? 0} points
                       </p>
                     </div>
                   </div>
@@ -137,7 +137,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
                     </div>
                   </div>
                   <span className={`text-2xl font-bold ${isCurrentPlayer ? 'text-purple-600' : ''}`}>
-                    {player.score || 0}
+                    {player.score ?? 0}
                   </span>
                 </div>
               );
@@ -163,7 +163,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
             </div>
             <div className="text-center p-4 bg-slate-50 rounded-lg">
               <p className="text-3xl font-bold text-purple-600">
-                {Math.max(...sortedPlayers.map(p => p.score || 0))}
+                {Math.max(...sortedPlayers.map(p => p.score ?? 0))}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Highest Score</p>
             </div>

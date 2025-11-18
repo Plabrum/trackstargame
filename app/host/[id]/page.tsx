@@ -9,14 +9,12 @@ import { HostGameController } from "@/components/host/HostGameController";
 import { FinalScore } from "@/components/game/FinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { toast } = useToast();
 
   // Fetch Spotify access token (initialize once at page level)
   const [accessToken, setAccessToken] = useState<string>('');
@@ -90,37 +88,16 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   // Host controls
   const {
     startGame,
-    startRound,
     judgeAnswer,
     nextRound,
     revealTrack,
     endGame,
     isStartingGame,
-    isStartingRound,
     isJudging,
     isAdvancing,
     isRevealing,
     isEndingGame,
-  } = useHost(id, {
-    onBuzz: (event) => {
-      toast({
-        title: "Buzz!",
-        description: `${event.playerName} buzzed at ${event.elapsedSeconds?.toFixed(2)}s`,
-      });
-    },
-    onReveal: (event) => {
-      toast({
-        title: "Track Revealed",
-        description: `${event.track.title} by ${event.track.artist}`,
-      });
-    },
-    onGameEnd: () => {
-      toast({
-        title: "Game Over!",
-        description: "All rounds completed",
-      });
-    },
-  });
+  } = useHost(id);
 
   // Loading state
   if (isLoadingSession || isLoadingPlayers || isLoadingAuth) {
@@ -165,8 +142,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   if (session.state === 'lobby') {
     return (
       <HostLobby
-        sessionId={id}
-        hostName={session.host_name}
+        session={session}
         players={players}
         onStartGame={startGame}
         isStarting={isStartingGame}
@@ -181,9 +157,6 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       currentTrack={currentTrack}
       buzzerPlayer={buzzerPlayer}
       elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
-      onStartRound={async () => {
-        return await startRound();
-      }}
       onJudgeCorrect={() => {
         judgeAnswer(true);
       }}
@@ -193,7 +166,6 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       onNextRound={nextRound}
       onRevealTrack={revealTrack}
       onEndGame={endGame}
-      isStartingRound={isStartingRound}
       isJudging={isJudging}
       isAdvancing={isAdvancing}
       isRevealing={isRevealing}

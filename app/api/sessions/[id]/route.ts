@@ -129,13 +129,36 @@ export async function PATCH(
           // Get next state through state machine
           const nextState = getNextGameState(currentState, 'start');
 
-          // Create first round
+          // Get random track from pack for first round
+          if (!session.pack_id) {
+            return NextResponse.json(
+              { error: 'Session has no pack assigned' },
+              { status: 400 }
+            );
+          }
+
+          const { data: tracks, error: tracksError } = await supabase
+            .from('tracks')
+            .select('id')
+            .eq('pack_id', session.pack_id);
+
+          if (tracksError || !tracks || tracks.length === 0) {
+            return NextResponse.json(
+              { error: 'No tracks found in pack' },
+              { status: 500 }
+            );
+          }
+
+          // Pick random track for first round
+          const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
+
+          // Create first round with track
           const { data: firstRound, error: roundError } = await supabase
             .from('game_rounds')
             .insert({
               session_id: sessionId,
               round_number: 1,
-              track_id: null, // Will be set when round starts
+              track_id: randomTrack.id,
             })
             .select()
             .single();
@@ -144,10 +167,14 @@ export async function PATCH(
             return NextResponse.json({ error: 'Failed to create first round' }, { status: 500 });
           }
 
-          // Update session state to 'ready' with current_round = 1
+          // Update session state to 'playing' with current_round = 1 and start time
           const { data: updatedSession, error: updateError } = await supabase
             .from('game_sessions')
-            .update({ state: nextState, current_round: 1 })
+            .update({
+              state: nextState,
+              current_round: 1,
+              round_start_time: new Date().toISOString(),
+            })
             .eq('id', sessionId)
             .select()
             .single();
@@ -160,6 +187,13 @@ export async function PATCH(
           await broadcastGameEvent(sessionId, {
             type: 'game_started',
             roundNumber: 1,
+          });
+
+          // Broadcast round start event
+          await broadcastGameEvent(sessionId, {
+            type: 'round_start',
+            roundNumber: 1,
+            trackId: randomTrack.id,
           });
 
           await broadcastStateChange(sessionId, nextState);
@@ -201,7 +235,7 @@ export async function PATCH(
           const leaderboard = (players || []).map(p => ({
             playerId: p.id,
             playerName: p.name,
-            score: p.score || 0,
+            score: p.score ?? 0,
           }));
 
           const winner = leaderboard[0] || {
@@ -240,9 +274,119 @@ export async function PATCH(
         }
       }
 
+      case 'settings': {
+        // Get session and validate
+        const { data: session, error: sessionError } = await supabase
+          .from('game_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single();
+
+        if (sessionError || !session) {
+          return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+        }
+
+        // Only allow settings update in lobby state
+        if (session.state !== 'lobby') {
+          return NextResponse.json(
+            { error: 'Settings can only be updated in lobby state' },
+            { status: 400 }
+          );
+        }
+
+        const { allowHostToPlay, allowSingleUser, totalRounds } = body;
+
+        // Validate settings
+        if (typeof totalRounds !== 'number' || totalRounds < 1 || totalRounds > 50) {
+          return NextResponse.json(
+            { error: 'Total rounds must be between 1 and 50' },
+            { status: 400 }
+          );
+        }
+
+        // Update session settings
+        const { data: updatedSession, error: updateError } = await supabase
+          .from('game_sessions')
+          .update({
+            allow_host_to_play: allowHostToPlay,
+            allow_single_user: allowSingleUser,
+            total_rounds: totalRounds,
+          })
+          .eq('id', sessionId)
+          .select()
+          .single();
+
+        if (updateError) {
+          return NextResponse.json({ error: updateError.message }, { status: 500 });
+        }
+
+        // If allow_host_to_play is enabled, create/ensure host player exists
+        if (allowHostToPlay) {
+          // Check if host player already exists
+          const { data: existingHostPlayer } = await supabase
+            .from('players')
+            .select('id')
+            .eq('session_id', sessionId)
+            .eq('name', session.host_name)
+            .single();
+
+          // Create host player if doesn't exist
+          if (!existingHostPlayer) {
+            const { data: newPlayer, error: playerError } = await supabase
+              .from('players')
+              .insert({
+                session_id: sessionId,
+                name: session.host_name,
+                score: 0,
+              })
+              .select()
+              .single();
+
+            if (playerError || !newPlayer) {
+              console.error('Failed to create host player:', playerError);
+              return NextResponse.json(
+                { error: 'Failed to create host player' },
+                { status: 500 }
+              );
+            }
+
+            // Broadcast player joined event
+            await broadcastGameEvent(sessionId, {
+              type: 'player_joined',
+              playerId: newPlayer.id,
+              playerName: session.host_name,
+            });
+          }
+        } else {
+          // If allow_host_to_play is disabled, remove host player if exists
+          const { data: hostPlayer } = await supabase
+            .from('players')
+            .select('id')
+            .eq('session_id', sessionId)
+            .eq('name', session.host_name)
+            .single();
+
+          if (hostPlayer) {
+            await supabase
+              .from('players')
+              .delete()
+              .eq('id', hostPlayer.id);
+
+            // Broadcast player left event
+            await broadcastGameEvent(sessionId, {
+              type: 'player_left',
+              playerId: hostPlayer.id,
+              playerName: session.host_name,
+            });
+          }
+        }
+
+        return NextResponse.json(updatedSession);
+      }
+
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use "start" or "end"' },
+          { error: 'Invalid action. Use "start", "end", or "settings"' },
           { status: 400 }
         );
     }

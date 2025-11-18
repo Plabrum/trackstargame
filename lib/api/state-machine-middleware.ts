@@ -46,8 +46,8 @@ export function validateStateTransition(from: GameState, to: GameState): void {
  */
 export function getNextGameState(
   currentState: GameState,
-  action: 'start' | 'start_round' | 'buzz' | 'judge' | 'next_round' | 'finish',
-  params?: { currentRound?: number; nextRound?: number }
+  action: 'start' | 'buzz' | 'judge' | 'next_round' | 'finish',
+  params?: { currentRound?: number; nextRound?: number; totalRounds?: number }
 ): GameState {
   const nextState = getNextState(currentState, action, params);
 
@@ -75,10 +75,20 @@ export function enforceGameStartRules(session: GameSession, playerCount: number)
     throw new GameRuleError(`Cannot start game from state '${session.state}'. Must be in lobby.`);
   }
 
+  // Determine minimum players based on session settings
+  let minPlayers: number = GAME_CONFIG.MIN_PLAYERS;
+  const maxPlayers: number = GAME_CONFIG.MAX_PLAYERS;
+
+  if (session.allow_single_user) {
+    minPlayers = 0; // Allow solo play
+  } else if (session.allow_host_to_play) {
+    minPlayers = 1; // Host counts as 1, need at least 1 other player
+  }
+
   // Must have valid player count
-  if (!isValidPlayerCount(playerCount)) {
+  if (playerCount < minPlayers || playerCount > maxPlayers) {
     throw new GameRuleError(
-      `Invalid player count: ${playerCount}. Must be between ${GAME_CONFIG.MIN_PLAYERS} and ${GAME_CONFIG.MAX_PLAYERS}.`
+      `Invalid player count: ${playerCount}. Must be between ${minPlayers} and ${maxPlayers}.`
     );
   }
 }
@@ -131,8 +141,11 @@ export function enforceNextRoundRules(session: GameSession, nextRoundNumber: num
     throw new GameRuleError(`Cannot advance to next round from state '${session.state}'. Must be in reveal state.`);
   }
 
+  // Use session-specific total rounds, fallback to config default
+  const totalRounds = session.total_rounds ?? GAME_CONFIG.TOTAL_ROUNDS;
+
   // Check if exceeding max rounds
-  if (nextRoundNumber > GAME_CONFIG.TOTAL_ROUNDS) {
-    throw new GameRuleError(`Cannot create round ${nextRoundNumber}. Maximum is ${GAME_CONFIG.TOTAL_ROUNDS}.`);
+  if (nextRoundNumber > totalRounds) {
+    throw new GameRuleError(`Cannot create round ${nextRoundNumber}. Maximum is ${totalRounds}.`);
   }
 }

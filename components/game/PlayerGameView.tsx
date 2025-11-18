@@ -9,6 +9,7 @@ import { Music, Zap } from "lucide-react";
 import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
 import type { Tables } from "@/lib/types/database";
+import type { RoundJudgment } from "@/hooks/usePlayer";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
@@ -22,6 +23,7 @@ interface PlayerGameViewProps {
   onBuzz: () => void;
   isBuzzing: boolean;
   canBuzz: boolean;
+  lastJudgment?: RoundJudgment | null;
 }
 
 export function PlayerGameView({
@@ -33,13 +35,14 @@ export function PlayerGameView({
   onBuzz,
   isBuzzing,
   canBuzz,
+  lastJudgment,
 }: PlayerGameViewProps) {
   const currentRound = session.current_round || 0;
   const totalRounds = 10;
   const state = session.state;
 
   // Sort players by score
-  const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const currentPlayerRank = sortedPlayers.findIndex((p) => p.id === currentPlayerId) + 1;
 
@@ -71,7 +74,7 @@ export function PlayerGameView({
         <h1 className="text-3xl font-bold">Round {currentRound} / {totalRounds}</h1>
         <div className="flex items-center justify-center gap-4">
           <Badge variant="outline">
-            Your Score: <AnimatedScore score={currentPlayer?.score || 0} />
+            Your Score: <AnimatedScore score={currentPlayer?.score ?? 0} />
           </Badge>
           <Badge variant="secondary">
             Rank: #{currentPlayerRank}
@@ -143,6 +146,30 @@ export function PlayerGameView({
           {/* Reveal State */}
           {state === 'reveal' && currentTrack && (
             <div className="space-y-4">
+              {/* Judgment Feedback - Show if this player was judged */}
+              {lastJudgment && lastJudgment.playerId === currentPlayerId && (
+                <Alert className={`border-2 ${
+                  lastJudgment.correct
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-red-500 bg-red-50'
+                }`}>
+                  <AlertDescription>
+                    <div className="text-center py-6">
+                      <p className={`text-4xl font-bold mb-2 ${
+                        lastJudgment.correct ? 'text-green-900' : 'text-red-900'
+                      }`}>
+                        {lastJudgment.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
+                      </p>
+                      <p className={`text-2xl font-semibold ${
+                        lastJudgment.correct ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                        {lastJudgment.pointsAwarded > 0 ? '+' : ''}{lastJudgment.pointsAwarded} points
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-2">Song Revealed</p>
                 <p className="text-2xl font-bold">{currentTrack.title}</p>
@@ -213,7 +240,7 @@ export function PlayerGameView({
                     </div>
                   </div>
                   <span className={`font-bold ${isCurrentPlayer ? 'text-purple-600' : ''}`}>
-                    <AnimatedScore score={player.score || 0} />
+                    <AnimatedScore score={player.score ?? 0} />
                   </span>
                 </div>
               );

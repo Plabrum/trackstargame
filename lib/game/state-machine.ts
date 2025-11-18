@@ -5,15 +5,14 @@
  */
 
 // Game states
-export type GameState = 'lobby' | 'ready' | 'playing' | 'buzzed' | 'reveal' | 'finished';
+export type GameState = 'lobby' | 'playing' | 'buzzed' | 'reveal' | 'finished';
 
 // State transitions mapping
 const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
-  lobby: ['ready'], // first round created
-  ready: ['playing'], // host starts round
-  playing: ['buzzed', 'reveal'], // buzzed if someone buzzes, reveal if no buzz/timeout
-  buzzed: ['reveal'],
-  reveal: ['ready', 'finished'], // ready for next round, finished if game over
+  lobby: ['playing', 'finished'], // first round starts or game ends early
+  playing: ['buzzed', 'reveal', 'finished'], // buzzed if someone buzzes, reveal if no buzz/timeout, or host ends game
+  buzzed: ['reveal', 'finished'], // host judges or ends game
+  reveal: ['playing', 'finished'], // next round starts, finished if game over
   finished: [], // Terminal state
 };
 
@@ -21,7 +20,7 @@ const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
  * Type guard to check if a string is a valid GameState.
  */
 export function isGameState(state: string): state is GameState {
-  return ['lobby', 'ready', 'playing', 'buzzed', 'reveal', 'finished'].includes(state);
+  return ['lobby', 'playing', 'buzzed', 'reveal', 'finished'].includes(state);
 }
 
 /**
@@ -81,18 +80,13 @@ export function isValidRound(roundNumber: number): boolean {
  */
 export function getNextState(
   currentState: GameState,
-  action: 'start' | 'start_round' | 'buzz' | 'judge' | 'next_round' | 'finish',
-  params?: { currentRound?: number; nextRound?: number }
+  action: 'start' | 'buzz' | 'judge' | 'next_round' | 'finish',
+  params?: { currentRound?: number; nextRound?: number; totalRounds?: number }
 ): GameState {
   switch (action) {
     case 'start':
-      // Starting the game: lobby → ready (first round created)
-      if (currentState === 'lobby') return 'ready';
-      break;
-
-    case 'start_round':
-      // Starting a round: ready → playing
-      if (currentState === 'ready') return 'playing';
+      // Starting the game: lobby → playing (first round created and started)
+      if (currentState === 'lobby') return 'playing';
       break;
 
     case 'buzz':
@@ -109,10 +103,11 @@ export function getNextState(
       if (currentState === 'reveal') {
         // Check if next round will exceed total rounds
         const nextRoundNumber = params?.nextRound ?? (params?.currentRound ?? 0) + 1;
-        if (nextRoundNumber > GAME_CONFIG.TOTAL_ROUNDS) {
+        const totalRounds = params?.totalRounds ?? GAME_CONFIG.TOTAL_ROUNDS;
+        if (nextRoundNumber > totalRounds) {
           return 'finished';
         }
-        return 'ready';
+        return 'playing';
       }
       break;
 

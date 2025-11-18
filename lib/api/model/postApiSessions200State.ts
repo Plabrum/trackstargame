@@ -12,7 +12,6 @@ export type PostApiSessions200State = typeof PostApiSessions200State[keyof typeo
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const PostApiSessions200State = {
   lobby: 'lobby',
-  ready: 'ready',
   playing: 'playing',
   buzzed: 'buzzed',
   reveal: 'reveal',

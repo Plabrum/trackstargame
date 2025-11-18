@@ -77,6 +77,8 @@ export type Database = {
       }
       game_sessions: {
         Row: {
+          allow_host_to_play: boolean
+          allow_single_user: boolean
           created_at: string | null
           current_round: number | null
           host_name: string
@@ -84,9 +86,12 @@ export type Database = {
           pack_id: string | null
           round_start_time: string | null
           state: string | null
+          total_rounds: number
           updated_at: string | null
         }
         Insert: {
+          allow_host_to_play?: boolean
+          allow_single_user?: boolean
           created_at?: string | null
           current_round?: number | null
           host_name: string
@@ -94,9 +99,12 @@ export type Database = {
           pack_id?: string | null
           round_start_time?: string | null
           state?: string | null
+          total_rounds?: number
           updated_at?: string | null
         }
         Update: {
+          allow_host_to_play?: boolean
+          allow_single_user?: boolean
           created_at?: string | null
           current_round?: number | null
           host_name?: string
@@ -104,6 +112,7 @@ export type Database = {
           pack_id?: string | null
           round_start_time?: string | null
           state?: string | null
+          total_rounds?: number
           updated_at?: string | null
         }
         Relationships: [
