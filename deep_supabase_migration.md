@@ -2,29 +2,212 @@
 
 ## Executive Summary
 
-This document outlines the complete migration from Next.js API Routes to a Supabase-native architecture. The migration will eliminate ~800 lines of API route code, remove manual broadcast logic, and leverage Supabase's built-in capabilities for real-time multiplayer game synchronization.
+This document outlines the complete migration from Next.js API Routes to a Supabase-native architecture with action-based state machine integration. The migration will eliminate ~800 lines of API route code, remove manual broadcast logic, and leverage Supabase's built-in capabilities for real-time multiplayer game synchronization.
 
 **Key Changes:**
 - Remove all game mutation API routes (keep only Spotify OAuth)
 - Delete manual broadcast code (use postgres_changes instead)
 - Implement hybrid mutation strategy (direct updates + selective RPC)
+- Integrate with action-based state machine for declarative UI
 - Reduce code by ~900 lines while improving performance and reliability
 
-**Timeline:** ~11 hours (can be done incrementally)
+**State Machine Integration:**
+The codebase now uses an action-based state machine (`getAvailableActions()`) that determines what actions are available based on role and game state. This migration integrates Supabase mutations with this system, where:
+- Client-side: State machine provides UX validation and action descriptors
+- Server-side: RLS policies and RPC functions enforce security and business rules
+- Actions map directly to Supabase operations (direct updates or RPC calls)
+
+**Timeline:** ~13 hours (can be done incrementally)
+- Phase 1: Database Foundation (2 hours)
+- Phase 2: Mutation Hooks & Action Integration (5 hours)
+- Phase 3: Component Refactoring (4 hours)
+- Phase 4: Cleanup & Testing (2 hours)
 
 ---
 
 ## Table of Contents
 
-1. [Current Architecture Problems](#current-architecture-problems)
-2. [Proposed Architecture](#proposed-architecture)
-3. [Broadcasting Strategy](#broadcasting-strategy)
-4. [Mutation Strategy](#mutation-strategy)
-5. [Database Migrations](#database-migrations)
-6. [Implementation Plan](#implementation-plan)
-7. [Code Examples](#code-examples)
-8. [Testing Strategy](#testing-strategy)
-9. [Rollback Plan](#rollback-plan)
+1. [Action-Based State Machine Integration](#action-based-state-machine-integration)
+2. [Current Architecture Problems](#current-architecture-problems)
+3. [Proposed Architecture](#proposed-architecture)
+4. [Broadcasting Strategy](#broadcasting-strategy)
+5. [Mutation Strategy](#mutation-strategy)
+6. [Database Migrations](#database-migrations)
+7. [Implementation Plan](#implementation-plan)
+8. [Code Examples](#code-examples)
+9. [Testing Strategy](#testing-strategy)
+10. [Rollback Plan](#rollback-plan)
+
+---
+
+## Action-Based State Machine Integration
+
+### Overview
+
+The codebase has been refactored to use an action-based state machine (see `STATE_MACHINE_USAGE.md`). This fundamentally changes how we approach mutations and UI state management.
+
+**Core Concept:**
+Instead of components manually checking conditions like:
+```typescript
+{state === 'lobby' && playerCount >= 2 && (
+  <button onClick={startGame}>Start Game</button>
+)}
+```
+
+Components now query "what can I do right now?":
+```typescript
+const actions = getAvailableActions(state, role, context);
+// Returns: [{ action: { type: 'start_game' }, label: 'Start Game', enabled: true, ... }]
+```
+
+### Action-to-Mutation Mapping
+
+Each action type maps to a specific Supabase operation:
+
+| Action Type | Mutation Type | Implementation |
+|-------------|---------------|----------------|
+| `start_game` | RPC | `supabase.rpc('start_game', ...)` |
+| `join_session` | Direct INSERT | `supabase.from('players').insert(...)` |
+| `buzz` | Direct UPDATE | `supabase.from('game_rounds').update(...)` |
+| `submit_answer` | RPC | `supabase.rpc('submit_answer', ...)` |
+| `judge_answer` | RPC | `supabase.rpc('judge_answer', ...)` |
+| `finalize_judgments` | RPC | `supabase.rpc('finalize_judgments', ...)` |
+| `advance_round` | RPC | `supabase.rpc('advance_round', ...)` |
+| `reveal_answer` | Direct UPDATE | `supabase.from('game_sessions').update(...)` |
+| `update_settings` | Direct UPDATE | `supabase.from('game_sessions').update(...)` |
+| `end_game` | Direct UPDATE | `supabase.from('game_sessions').update(...)` |
+
+### Two-Layer Validation
+
+**Client-Side (UX Layer):**
+- State machine determines which actions are available
+- Provides user-friendly disabled reasons
+- Prevents UI from showing invalid actions
+- **Cannot be trusted for security** (user can modify client code)
+
+```typescript
+// lib/game/state-machine.ts
+export function getAvailableActions(state, role, context) {
+  // Returns actions with enabled: true/false
+  // Example: Can't buzz if someone already buzzed
+}
+```
+
+**Server-Side (Security Layer):**
+- RLS policies enforce row-level security
+- RPC functions validate business rules
+- Database constraints prevent invalid data
+- **Source of truth** for what's allowed
+
+```sql
+-- RLS policy ensures state validation
+CREATE POLICY "Can buzz in playing state"
+  ON game_rounds FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM game_sessions
+      WHERE id = session_id AND state = 'playing'
+    )
+  );
+```
+
+**Why Both?**
+- Client-side: Fast feedback, better UX, prevents unnecessary requests
+- Server-side: Security, data integrity, cannot be bypassed
+
+### Component Architecture Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Component (HostGameView.tsx)                                │
+│                                                             │
+│  const actions = useGameActions('host', session, ...)      │
+│  ↓                                                          │
+│  actions.map(desc => <ActionButton {...desc} />)           │
+│  ↓ User clicks button                                      │
+│  handleAction(action)                                      │
+└─────────────────────────────────────┬───────────────────────┘
+                                      │
+                                      ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Action Handler                                              │
+│                                                             │
+│  function handleAction(action: HostAction | PlayerAction) {│
+│    switch (action.type) {                                  │
+│      case 'start_game':                                    │
+│        startGameMutation.mutate(sessionId);  ←──────────┐  │
+│        break;                                           │  │
+│      case 'buzz':                                       │  │
+│        buzzMutation.mutate({ sessionId, playerId });    │  │
+│        break;                                           │  │
+│      // ...                                             │  │
+│    }                                                    │  │
+│  }                                                      │  │
+└─────────────────────────────────────────────────────────┼───┘
+                                                          │
+                                                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Mutation Hook (hooks/mutations/use-game-mutations.ts)      │
+│                                                             │
+│  export function useStartGame() {                          │
+│    return useMutation({                                    │
+│      mutationFn: async (sessionId) => {                    │
+│        const { data, error } = await supabase             │
+│          .rpc('start_game', { p_session_id: sessionId })  │
+│        if (error) throw error;                            │
+│        return data;                                       │
+│      }                                                    │
+│    });                                                    │
+│  }                                                        │
+└─────────────────────────────────────┬───────────────────────┘
+                                      │
+                                      ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Supabase (RLS + RPC + Postgres Changes)                    │
+│                                                             │
+│  1. RPC function validates and executes                    │
+│  2. Database triggers fire (e.g., auto-calculate time)     │
+│  3. postgres_changes broadcasts to all clients             │
+│  4. React Query invalidates and refetches                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Benefits of This Approach
+
+1. **Separation of Concerns:**
+   - State machine: "What can I do?"
+   - Mutation hooks: "How do I do it?"
+   - RLS/RPC: "Am I allowed to do it?"
+
+2. **Declarative UI:**
+   - No complex conditionals in components
+   - Single source of truth for available actions
+   - Automatic accessibility (labels, descriptions, disabled states)
+
+3. **Type Safety:**
+   - Action types are discriminated unions
+   - TypeScript enforces exhaustive handling
+   - Compile-time guarantees for action parameters
+
+4. **Testability:**
+   - State machine is pure function (easy unit tests)
+   - Mutation hooks are isolated (easy integration tests)
+   - RPC functions testable via pgTAP
+
+5. **Maintainability:**
+   - Business rules centralized in state machine
+   - UI automatically updates when rules change
+   - Clear action → mutation → database flow
+
+### Migration Impact
+
+This migration must preserve and enhance the action-based system:
+
+1. **Mutation hooks** must be callable from action handlers
+2. **RLS policies** must align with state machine rules (but enforce them)
+3. **RPC functions** must match action parameters
+4. **Components** should use action descriptors, not direct mutation calls
+5. **Error handling** should translate database errors to user-friendly messages
 
 ---
 
@@ -186,9 +369,9 @@ await supabase
 - `lib/game/realtime.ts` - All manual broadcast functions
 
 **Middleware (~200 lines):**
-- `lib/api/state-machine-middleware.ts` - Validation moves to RLS/RPC
+- ~~`lib/api/state-machine-middleware.ts`~~ - **Already deleted** (replaced by action-based state machine)
 
-**Total deletion: ~1,077 lines**
+**Total deletion: ~877 lines** (middleware already removed in state machine refactor)
 
 ### What Gets Added
 
@@ -203,7 +386,13 @@ await supabase
 - RPC call hooks (start, judge, advance, submit, finalize)
 - Error translation utility
 
-**Net change: ~350 new lines, ~1,077 deleted = -727 lines total**
+**Action Integration (~150 lines):**
+- `hooks/useGameActions.ts` - Hook to build action descriptors from game context (~80 lines)
+- `components/ActionButton.tsx` - Reusable action button component (~70 lines)
+
+**Net change: ~800 new lines, ~877 deleted = -77 lines total**
+
+**Note:** The state machine itself (`lib/game/state-machine.ts`) was already added in the state machine refactor and contains ~428 lines including the `getAvailableActions()` function.
 
 ---
 
@@ -980,9 +1169,9 @@ ALTER TABLE game_rounds
 
 ---
 
-### Phase 2: New Mutation Hooks (4 hours)
+### Phase 2: New Mutation Hooks & Action Integration (5 hours)
 
-**Goal:** Build new Supabase-native hooks alongside existing API routes.
+**Goal:** Build new Supabase-native hooks alongside existing API routes and integrate with action system.
 
 **Steps:**
 
@@ -1076,7 +1265,21 @@ ALTER TABLE game_rounds
    - `useFinalizeJudgments()` - RPC call
    - `useEndGame()` - RPC call
 
-4. **Update realtime subscriptions** (30 min)
+4. **Create useGameActions hook** (30 min)
+
+   **File:** `hooks/useGameActions.ts`
+
+   See [Code Examples](#code-examples) section for complete implementation.
+
+   This hook wraps `getAvailableActions()` and builds the `GameContext` from database types.
+
+5. **Create ActionButton component** (30 min)
+
+   **File:** `components/ActionButton.tsx`
+
+   Reusable component that renders action descriptors with proper accessibility.
+
+6. **Update realtime subscriptions** (30 min)
 
    **File:** `hooks/queries/use-game.ts`
    ```typescript
@@ -1114,64 +1317,104 @@ ALTER TABLE game_rounds
 - ✅ All new mutation hooks created
 - ✅ Type safety working (autocomplete, compile errors)
 - ✅ Error translation working
+- ✅ useGameActions hook created
+- ✅ ActionButton component created
 - ✅ Realtime subscriptions updated
 - ✅ Old API routes still functional (parallel implementation)
 
 ---
 
-### Phase 3: Component Updates (3 hours)
+### Phase 3: Component Updates (4 hours)
 
-**Goal:** Switch components to use new mutation hooks.
+**Goal:** Refactor components to use action-based architecture with new mutation hooks.
 
 **Steps:**
 
-1. **Update HostGameView** (1 hour)
+1. **Refactor HostGameView** (1.5 hours)
 
    **File:** `components/host/HostGameView.tsx`
+
+   Major refactor to use action system:
+   - Replace conditional button rendering with `useGameActions()` hook
+   - Create `handleAction()` function to dispatch to mutation hooks
+   - Use `<ActionButton>` component for all host actions
+   - Remove manual state checking logic
+
    ```typescript
-   // Before:
-   import { useStartGame, useJudgeAnswer } from '@/hooks/mutations/use-game-mutations';
+   // Before: Manual conditionals
+   {state === 'lobby' && playerCount >= 2 && (
+     <button onClick={startGame}>Start Game</button>
+   )}
+   {state === 'buzzed' && (
+     <>
+       <button onClick={() => judge(true)}>Correct</button>
+       <button onClick={() => judge(false)}>Incorrect</button>
+     </>
+   )}
 
-   // After:
-   import { useStartGame, useJudgeAnswer } from '@/hooks/mutations/use-game-mutations-v2';
+   // After: Action-based
+   const actions = useGameActions('host', session, players, currentRound);
 
-   // Everything else stays the same!
+   return (
+     <div className="actions">
+       {actions.map(desc => (
+         <ActionButton {...desc} onClick={() => handleAction(desc.action)} />
+       ))}
+     </div>
+   );
    ```
 
-2. **Update PlayerGameView** (1 hour)
+2. **Refactor PlayerGameView** (1.5 hours)
 
    **File:** `app/play/[id]/page.tsx`
-   ```typescript
-   // Before:
-   import { useBuzz } from '@/hooks/mutations/use-game-mutations';
 
-   // After:
-   import { useBuzz } from '@/hooks/mutations/use-game-mutations-v2';
+   Similar refactor for player view:
+   - Use `useGameActions('player', ...)` hook
+   - Create action handler for player actions (join, buzz, submit)
+   - Replace conditional rendering with action-based approach
+
+   ```typescript
+   // Before: Manual conditionals
+   {!hasJoined && (
+     <JoinForm onSubmit={joinSession} />
+   )}
+   {state === 'playing' && !hasPlayerBuzzed && (
+     <button onClick={buzz}>Buzz In</button>
+   )}
+
+   // After: Action-based
+   const actions = useGameActions('player', session, players, currentRound, playerId);
+
+   // Render actions based on descriptors
    ```
 
-3. **Update host page** (30 min)
+3. **Update state-specific views** (30 min)
 
-   **File:** `app/host/[id]/page.tsx`
-   ```typescript
-   // Update imports
-   import { useStartGame, useEndGame } from '@/hooks/mutations/use-game-mutations-v2';
-   ```
+   Files that need updates:
+   - `components/game/LobbyView.tsx`
+   - `components/game/PlayingView.tsx`
+   - `components/game/BuzzedView.tsx`
+   - `components/game/RevealView.tsx`
+
+   Replace direct mutation calls with action handlers.
 
 4. **Test all flows** (30 min)
    - Create session (still uses API route for Spotify auth)
-   - Join session (new direct INSERT)
-   - Update settings (new direct UPDATE)
-   - Start game (new RPC)
-   - Buzz in (new direct UPDATE)
-   - Judge answer (new RPC)
-   - Advance round (new RPC)
-   - End game (new RPC)
+   - Join session (new direct INSERT via action)
+   - Update settings (new direct UPDATE via action)
+   - Start game (new RPC via action)
+   - Buzz in (new direct UPDATE via action)
+   - Judge answer (new RPC via action)
+   - Advance round (new RPC via action)
+   - End game (new RPC via action)
 
 **Success Criteria:**
-- ✅ All components using new hooks
+- ✅ All components using action-based approach
+- ✅ No manual state conditionals for actions
 - ✅ Full game flow works end-to-end
 - ✅ Realtime updates work
 - ✅ Error messages are user-friendly
+- ✅ Accessibility improved (labels, descriptions, tooltips)
 
 ---
 
@@ -1236,12 +1479,199 @@ ALTER TABLE game_rounds
 
 ## Code Examples
 
+### Action Handler Integration
+
+First, let's see how components use the action system with mutation hooks:
+
+```typescript
+// components/host/HostGameView.tsx
+import { getAvailableActions, HostAction, GameContext } from '@/lib/game/state-machine';
+import {
+  useStartGame,
+  useJudgeAnswer,
+  useAdvanceRound,
+  useEndGame,
+  useUpdateSettings,
+  useRevealAnswer,
+} from '@/hooks/mutations/use-game-mutations';
+
+export function HostGameView({ session, players, currentRound }) {
+  // Get mutation hooks
+  const startGame = useStartGame();
+  const judgeAnswer = useJudgeAnswer();
+  const advanceRound = useAdvanceRound();
+  const endGame = useEndGame();
+  const updateSettings = useUpdateSettings();
+  const revealAnswer = useRevealAnswer();
+
+  // Build game context
+  const context: GameContext = {
+    sessionId: session.id,
+    state: session.state,
+    currentRound: session.current_round ?? 1,
+    totalRounds: session.total_rounds,
+    allowSingleUser: session.allow_single_user,
+    allowHostToPlay: session.allow_host_to_play,
+    enableTextInputMode: session.enable_text_input_mode,
+    playerCount: players.length,
+    hasJoined: true,
+  };
+
+  // Get available actions from state machine
+  const actions = getAvailableActions(session.state, 'host', context);
+
+  // Handle action dispatch
+  const handleAction = (action: HostAction) => {
+    switch (action.type) {
+      case 'start_game':
+        startGame.mutate(session.id);
+        break;
+
+      case 'judge_answer':
+        judgeAnswer.mutate({
+          sessionId: session.id,
+          correct: action.correct,
+        });
+        break;
+
+      case 'advance_round':
+        advanceRound.mutate(session.id);
+        break;
+
+      case 'reveal_answer':
+        revealAnswer.mutate(session.id);
+        break;
+
+      case 'update_settings':
+        // Open settings modal, then call:
+        updateSettings.mutate({
+          sessionId: session.id,
+          settings: action.settings,
+        });
+        break;
+
+      case 'end_game':
+        endGame.mutate(session.id);
+        break;
+
+      case 'finalize_judgments':
+        // Not shown: handled in submitted state
+        break;
+    }
+  };
+
+  return (
+    <div className="host-panel">
+      <h2>Host Controls</h2>
+      <div className="actions">
+        {actions.map((actionDesc) => (
+          <ActionButton
+            key={actionDesc.label}
+            {...actionDesc}
+            onClick={() => handleAction(actionDesc.action as HostAction)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### Action Button Component
+
+```typescript
+// components/ActionButton.tsx
+import { ActionDescriptor } from '@/lib/game/state-machine';
+import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
+
+export function ActionButton<T>({
+  action,
+  label,
+  description,
+  enabled,
+  disabledReason,
+  variant = 'primary',
+  onClick,
+}: ActionDescriptor<T> & { onClick: () => void }) {
+  const button = (
+    <Button
+      onClick={onClick}
+      disabled={!enabled}
+      variant={variant}
+      aria-label={label}
+      aria-describedby={disabledReason ? 'disabled-reason' : undefined}
+    >
+      {label}
+    </Button>
+  );
+
+  if (disabledReason) {
+    return (
+      <Tooltip content={disabledReason}>
+        {button}
+      </Tooltip>
+    );
+  }
+
+  return button;
+}
+```
+
+### Custom Hook: useGameActions
+
+```typescript
+// hooks/useGameActions.ts
+import { useMemo } from 'react';
+import { getAvailableActions, GameContext, Role } from '@/lib/game/state-machine';
+import type { GameSession, Player, GameRound } from '@/lib/types/database';
+
+export function useGameActions(
+  role: Role,
+  session: GameSession | null,
+  players: Player[],
+  currentRound?: GameRound,
+  playerId?: string,
+  hasSubmittedAnswer?: boolean
+) {
+  return useMemo(() => {
+    if (!session) return [];
+
+    const context: GameContext = {
+      sessionId: session.id,
+      state: session.state as any,
+      currentRound: session.current_round ?? 1,
+      totalRounds: session.total_rounds,
+      allowSingleUser: session.allow_single_user,
+      allowHostToPlay: session.allow_host_to_play,
+      enableTextInputMode: session.enable_text_input_mode,
+      playerCount: players.length,
+      hasJoined: role === 'host' || players.some(p => p.id === playerId),
+      playerId,
+      hasPlayerBuzzed: currentRound?.buzzer_player_id != null,
+      hasCurrentPlayerSubmitted: hasSubmittedAnswer,
+      allPlayersSubmitted: false, // TODO: calculate from round_answers
+    };
+
+    return getAvailableActions(session.state as any, role, context);
+  }, [
+    session,
+    players,
+    currentRound,
+    role,
+    playerId,
+    hasSubmittedAnswer,
+  ]);
+}
+```
+
 ### Direct Update: Join Session
 
 ```typescript
 /**
  * Join a game session as a player
  * Uses direct INSERT with RLS policy validation
+ * Called from action handler when action.type === 'join_session'
  */
 export function useJoinSession() {
   const queryClient = useQueryClient();
@@ -1646,12 +2076,15 @@ const buzz = USE_SUPABASE_NATIVE ? useBuzzV2() : useBuzz();
 |----------|--------|-------|-----------|
 | API Routes | 800 lines | 0 lines | -800 |
 | Broadcast Code | 77 lines | 0 lines | -77 |
-| Middleware | 200 lines | 0 lines | -200 |
+| Middleware | 200 lines | 0 lines* | -200 |
 | **Total Deleted** | | | **-1,077 lines** |
 | Database Migrations | 0 lines | 650 lines | +650 |
 | New Hooks | 0 lines | 300 lines | +300 |
-| **Total Added** | | | **+950 lines** |
-| **Net Change** | | | **-127 lines** |
+| Action Integration | 0 lines | 150 lines | +150 |
+| **Total Added** | | | **+1,100 lines** |
+| **Net Change** | | | **+23 lines** |
+
+*Middleware was already deleted in state machine refactor
 
 ### Performance Improvements
 
@@ -1678,6 +2111,16 @@ const buzz = USE_SUPABASE_NATIVE ? useBuzzV2() : useBuzz();
 ✅ **Faster iteration** - No API routes to rebuild
 ✅ **Easier testing** - Test database functions directly
 
+### Action-Based Architecture Benefits
+
+✅ **Declarative UI** - Components query "what can I do?" instead of checking conditions
+✅ **Single source of truth** - All game rules centralized in state machine
+✅ **Type-safe actions** - TypeScript enforces exhaustive action handling
+✅ **Better accessibility** - Automatic labels, descriptions, and disabled reasons
+✅ **Easier refactoring** - Change state machine logic, UI updates automatically
+✅ **Testable rules** - Pure function testing for game logic
+✅ **Clear separation** - UI concerns separate from business logic and security
+
 ---
 
 ## Conclusion
@@ -1686,12 +2129,64 @@ This migration transforms your architecture from:
 
 **Complex:** Client → API → Supabase → API → Manual Broadcast → Clients
 
-**To Simple:** Client → Supabase (with RLS + Triggers + Realtime) → Clients
+**To Simple:** Client (Action System) → Supabase (RLS + RPC + Triggers + Realtime) → Clients
 
-The result is less code, better performance, improved reliability, and easier maintenance—all while staying within the Supabase ecosystem you're already using.
+### Architecture Layers
 
-**Estimated Timeline:** 11 hours (can be done incrementally over a few days)
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Presentation Layer (React Components)                      │
+│ - Render action buttons based on descriptors               │
+│ - Handle user interactions                                 │
+│ - Display game state                                       │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │
+                                  ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Action Layer (State Machine)                               │
+│ - Determine available actions                              │
+│ - Client-side validation for UX                           │
+│ - Action descriptors with labels/descriptions              │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │
+                                  ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Mutation Layer (React Query Hooks)                        │
+│ - Map actions to Supabase operations                       │
+│ - Handle optimistic updates                                │
+│ - Error translation                                        │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │
+                                  ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Data Layer (Supabase)                                      │
+│ - RLS policies (security)                                  │
+│ - RPC functions (complex logic)                            │
+│ - Database triggers (automation)                            │
+│ - postgres_changes (realtime)                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Outcomes
+
+The result is:
+- ✅ **Simpler codebase** - ~877 lines deleted, clearer architecture
+- ✅ **Better performance** - 50% faster latency, fewer network hops
+- ✅ **Improved reliability** - Atomic operations, no race conditions
+- ✅ **Easier maintenance** - Centralized rules, auto-generated types
+- ✅ **Better UX** - Declarative UI, better accessibility
+- ✅ **Type safety** - End-to-end TypeScript guarantees
+
+All while staying within the Supabase ecosystem and leveraging the action-based state machine.
+
+**Estimated Timeline:** 13 hours (can be done incrementally over a few days)
 
 **Risk Level:** Low (parallel implementation allows testing before cutover)
 
 **Recommended Approach:** Proceed phase-by-phase, test thoroughly at each step.
+
+**Next Steps:**
+1. Apply database migrations (Phase 1)
+2. Create mutation hooks and action integration (Phase 2)
+3. Refactor components to use actions (Phase 3)
+4. Delete old API routes and test (Phase 4)
