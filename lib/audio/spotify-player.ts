@@ -133,6 +133,47 @@ export class SpotifyPlayer {
       const error = await response.text();
       throw new Error(`Failed to transfer playback: ${error}`);
     }
+
+    // Poll for device to become active (max 5 seconds)
+    await new Promise<void>((resolve, reject) => {
+      const startTime = Date.now();
+      const maxWaitMs = 5000;
+      const pollIntervalMs = 500;
+
+      const checkDevice = async () => {
+        try {
+          const stateResponse = await fetch('https://api.spotify.com/v1/me/player', {
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+            },
+          });
+
+          if (stateResponse.status === 200) {
+            const state = await stateResponse.json();
+            if (state.device?.id === deviceId && state.device?.is_active) {
+              console.log('Device is now active');
+              resolve();
+              return;
+            }
+          }
+
+          // Check if we've exceeded max wait time
+          if (Date.now() - startTime >= maxWaitMs) {
+            console.warn('Device activation timeout - proceeding anyway');
+            resolve();
+            return;
+          }
+
+          // Continue polling
+          setTimeout(checkDevice, pollIntervalMs);
+        } catch (error) {
+          console.error('Error checking device state:', error);
+          reject(error);
+        }
+      };
+
+      checkDevice();
+    });
   }
 
   private setupEventListeners(): void {

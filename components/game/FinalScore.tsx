@@ -163,7 +163,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
             </div>
             <div className="text-center p-4 bg-slate-50 rounded-lg">
               <p className="text-3xl font-bold text-purple-600">
-                {Math.max(...sortedPlayers.map(p => p.score ?? 0))}
+                {sortedPlayers.length > 0 ? Math.max(...sortedPlayers.map(p => p.score ?? 0)) : 0}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Highest Score</p>
             </div>

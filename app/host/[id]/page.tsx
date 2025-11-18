@@ -146,6 +146,8 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
         players={players}
         onStartGame={startGame}
         isStarting={isStartingGame}
+        isSpotifyReady={spotifyPlayer.isReady}
+        spotifyError={playerError || spotifyPlayer.error}
       />
     );
   }

@@ -47,23 +47,26 @@ export function useSpotifyPlayer(
   useEffect(() => {
     // Don't show error if token hasn't been fetched yet (empty string)
     if (!options.accessToken) {
-      console.log('Waiting for access token...');
+      console.log('[useSpotifyPlayer] Waiting for access token...');
       return;
     }
 
+    console.log('[useSpotifyPlayer] Initializing Spotify player...');
+
     const callbacks: SpotifyPlayerCallbacks = {
       onReady: () => {
-        console.log('Spotify Player Ready');
+        console.log('[useSpotifyPlayer] Player Ready');
         setIsReady(true);
         setError(null);
         options.onReady?.();
       },
       onError: (err) => {
-        console.error('Spotify Player Error:', err);
+        console.error('[useSpotifyPlayer] Player Error:', err);
         setError(err);
         options.onError?.(err);
       },
       onTrackEnd: () => {
+        console.log('[useSpotifyPlayer] Track Ended');
         setIsPlaying(false);
         options.onTrackEnd?.();
       },
@@ -81,12 +84,13 @@ export function useSpotifyPlayer(
     player
       .initialize(options.deviceName || 'Trackstar Game')
       .catch((err) => {
-        console.error('Failed to initialize Spotify player:', err);
+        console.error('[useSpotifyPlayer] Failed to initialize:', err);
         setError(err.message);
       });
 
     // Cleanup on unmount
     return () => {
+      console.log('[useSpotifyPlayer] Cleaning up - disconnecting player');
       player.disconnect();
       playerRef.current = null;
     };

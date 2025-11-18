@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Users, Settings } from "lucide-react";
+import { Copy, Users, Settings, Music, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import type { Tables } from "@/lib/types/database";
@@ -19,9 +19,11 @@ interface HostLobbyProps {
   players: Player[];
   onStartGame: () => void;
   isStarting: boolean;
+  isSpotifyReady: boolean;
+  spotifyError: string | null;
 }
 
-export function HostLobby({ session, players, onStartGame, isStarting }: HostLobbyProps) {
+export function HostLobby({ session, players, onStartGame, isStarting, isSpotifyReady, spotifyError }: HostLobbyProps) {
   const { toast } = useToast();
   const router = useRouter();
   const sessionId = session.id;
@@ -38,7 +40,7 @@ export function HostLobby({ session, players, onStartGame, isStarting }: HostLob
     minPlayers = 1; // Host counts as 1, need at least 1 other player
   }
 
-  const canStart = players.length >= minPlayers && players.length <= maxPlayers;
+  const canStart = players.length >= minPlayers && players.length <= maxPlayers && isSpotifyReady;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(sessionId);
@@ -187,13 +189,38 @@ export function HostLobby({ session, players, onStartGame, isStarting }: HostLob
         </Card>
       </div>
 
+      {/* Spotify Status */}
+      {!isSpotifyReady && !spotifyError && (
+        <Alert>
+          <Music className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Initializing Spotify player... This may take a few seconds.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {spotifyError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {spotifyError}
+            <br />
+            <span className="text-sm">
+              Try refreshing the page or signing in again. Spotify Premium may be required for full playback.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Start Game Section */}
       <Card className="border-2 border-primary">
         <CardContent className="pt-6">
           {!canStart && (
             <Alert className="mb-4">
               <AlertDescription>
-                {players.length < minPlayers
+                {!isSpotifyReady
+                  ? "Waiting for Spotify player to initialize..."
+                  : players.length < minPlayers
                   ? session.allow_single_user
                     ? `Waiting for players (currently ${players.length}). Solo mode enabled, you can start anytime!`
                     : session.allow_host_to_play
