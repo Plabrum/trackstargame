@@ -1,15 +1,18 @@
 /**
- * Mutation hooks for game actions.
+ * Mutation hooks for game actions using Supabase-native approach.
  *
- * Updated to use new RESTful API structure.
+ * Uses direct table operations for simple mutations and RPC functions for complex ones.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createClient } from '@/lib/supabase/client';
+import { translateDBError } from '@/lib/utils/translate-db-error';
+import type { TableRow, RPCFunction } from '@/lib/types/database-helpers';
 
 /**
  * Create a new game session.
  *
- * POST /api/sessions
+ * POST /api/sessions (still uses API route for Spotify auth)
  */
 export function useCreateSession() {
   const queryClient = useQueryClient();
@@ -28,7 +31,7 @@ export function useCreateSession() {
       }
 
       const data = await response.json();
-      return data.id as string; // Return session ID
+      return data.id as string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
@@ -37,104 +40,126 @@ export function useCreateSession() {
 }
 
 /**
- * Join an existing game session as a player.
- *
- * POST /api/sessions/[id]/players
+ * Join a game session as a player
+ * Uses direct INSERT with RLS policy validation
  */
 export function useJoinSession() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (params: { sessionId: string; playerName: string }) => {
-      const response = await fetch(`/api/sessions/${params.sessionId}/players`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: params.playerName }),
-      });
+      const { data, error } = await supabase
+        .from('players')
+        .insert({
+          session_id: params.sessionId,
+          name: params.playerName.trim(),
+          score: 0,
+        })
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to join session');
-      }
-
-      const data = await response.json();
-      return data.id as string; // Return player ID
+      if (error) throw error;
+      return data as TableRow<'players'>;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'players'],
       });
+      return data.id;
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
     },
   });
 }
 
 /**
- * Start the game (host only).
- *
- * PATCH /api/sessions/[id] { action: "start", settings: {...} }
+ * Start the game
+ * Uses RPC function for multi-step operation
  */
 export function useStartGame() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data, error } = await supabase
+        .rpc('start_game', { p_session_id: sessionId })
+        .single();
+
+      if (error) throw error;
+      return data as RPCFunction<'start_game'>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['sessions', data.id, 'rounds'] });
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
+    },
+  });
+}
+
+/**
+ * Buzz in during a round
+ * Uses direct UPDATE with atomic check and optimistic update
+ */
+export function useBuzz() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (params: {
       sessionId: string;
-      settings?: {
-        totalRounds?: number;
-        allowHostToPlay?: boolean;
-        allowSingleUser?: boolean;
-        enableTextInputMode?: boolean;
-      };
+      playerId: string;
+      currentRound: number
     }) => {
-      const response = await fetch(`/api/sessions/${params.sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start', settings: params.settings }),
+      const { data, error } = await supabase
+        .from('game_rounds')
+        .update({ buzzer_player_id: params.playerId })
+        .eq('session_id', params.sessionId)
+        .eq('round_number', params.currentRound)
+        .is('buzzer_player_id', null)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as TableRow<'game_rounds'>;
+    },
+
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({
+        queryKey: ['sessions', variables.sessionId],
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to start game');
-      }
+      const previousSession = queryClient.getQueryData<TableRow<'game_sessions'>>([
+        'sessions',
+        variables.sessionId,
+      ]);
 
-      return response.json();
-    },
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions', params.sessionId] });
-    },
-  });
-}
-
-/**
- * Buzz in during a round (player action).
- *
- * POST /api/sessions/[id]/rounds/current/buzz
- */
-export function useBuzz() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { sessionId: string; playerId: string }) => {
-      const response = await fetch(
-        `/api/sessions/${params.sessionId}/rounds/current/buzz`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: params.playerId }),
+      queryClient.setQueryData<TableRow<'game_sessions'>>(
+        ['sessions', variables.sessionId],
+        (old) => {
+          if (!old) return old;
+          return { ...old, state: 'buzzed' as any };
         }
       );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to buzz');
-      }
-
-      return response.json();
+      return { previousSession };
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ['sessions', variables.sessionId],
-      });
+
+    onError: (error, variables, context) => {
+      if (context?.previousSession) {
+        queryClient.setQueryData(
+          ['sessions', variables.sessionId],
+          context.previousSession
+        );
+      }
+      throw new Error(translateDBError(error));
+    },
+
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'rounds'],
       });
@@ -143,198 +168,130 @@ export function useBuzz() {
 }
 
 /**
- * Judge an answer as correct or incorrect (host only).
- *
- * PATCH /api/sessions/[id]/rounds/current { action: "judge", correct: boolean }
+ * Judge a buzzed answer
+ * Uses RPC function for atomic multi-table update
  */
 export function useJudgeAnswer() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (params: { sessionId: string; correct: boolean }) => {
-      const response = await fetch(
-        `/api/sessions/${params.sessionId}/rounds/current`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'judge', correct: params.correct }),
-        }
-      );
+      const { data, error } = await supabase
+        .rpc('judge_answer', {
+          p_session_id: params.sessionId,
+          p_correct: params.correct,
+        })
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to judge answer');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return data as RPCFunction<'judge_answer'>;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId],
+      });
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'players'],
       });
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'rounds'],
       });
-      queryClient.invalidateQueries({
-        queryKey: ['sessions', variables.sessionId],
-      });
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
     },
   });
 }
 
 /**
  * Reveal track without buzzing
- *
- * PATCH /api/sessions/[id]/rounds/current { action: "reveal" }
+ * Uses direct UPDATE to set state to 'reveal'
  */
-export function useRevealTrack() {
+export function useRevealAnswer() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/sessions/${sessionId}/rounds/current`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reveal' }),
-      });
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({ state: 'reveal' })
+        .eq('id', sessionId)
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to reveal track');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return data as TableRow<'game_sessions'>;
     },
-    onSuccess: (_, sessionId) => {
+    onSuccess: (data, sessionId) => {
       queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
-  });
-}
-
-/**
- * Start a round
- *
- * PATCH /api/sessions/[id]/rounds/current { action: "start" }
- */
-export function useStartRound() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/sessions/${sessionId}/rounds/current`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to start round');
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, sessionId) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
     },
   });
 }
 
 /**
  * Advance to next round
- *
- * POST /api/sessions/[id]/rounds
+ * Uses RPC function for complex logic and random track selection
  */
-export function useNextRound() {
+export function useAdvanceRound() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/sessions/${sessionId}/rounds`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+      const { data, error } = await supabase
+        .rpc('advance_round', { p_session_id: sessionId })
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to advance round');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return data as RPCFunction<'advance_round'>;
     },
-    onSuccess: (_, sessionId) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', data.session_id] });
       queryClient.invalidateQueries({
-        queryKey: ['sessions', sessionId, 'rounds'],
+        queryKey: ['sessions', data.session_id, 'rounds'],
       });
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
     },
   });
 }
 
 /**
- * End the game
- *
- * PATCH /api/sessions/[id] { action: "end" }
- */
-export function useEndGame() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'end' }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to end game');
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, sessionId) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
-    },
-  });
-}
-
-/**
- * Submit an answer (text input mode).
- *
- * POST /api/sessions/[id]/rounds/current/submit-answer
+ * Submit an answer (text input mode)
+ * Uses RPC function for conditional logic
  */
 export function useSubmitAnswer() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (params: {
       sessionId: string;
       playerId: string;
-      answer: string
+      answer: string;
+      autoValidated: boolean;
+      pointsAwarded: number;
     }) => {
-      const response = await fetch(
-        `/api/sessions/${params.sessionId}/rounds/current/submit-answer`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            playerId: params.playerId,
-            answer: params.answer
-          }),
-        }
-      );
+      const { data, error } = await supabase
+        .rpc('submit_answer', {
+          p_session_id: params.sessionId,
+          p_player_id: params.playerId,
+          p_answer: params.answer,
+          p_auto_validated: params.autoValidated,
+          p_points_awarded: params.pointsAwarded,
+        })
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to submit answer');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return data as RPCFunction<'submit_answer'>;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId],
       });
@@ -342,42 +299,36 @@ export function useSubmitAnswer() {
         queryKey: ['sessions', variables.sessionId, 'rounds'],
       });
     },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
+    },
   });
 }
 
 /**
- * Finalize judgments after all answers submitted (host only).
- *
- * PATCH /api/sessions/[id]/rounds/current { action: "finalize", overrides: {...} }
+ * Finalize judgments after all answers submitted (host only)
+ * Uses RPC function for batch updates
  */
-export function useFinalizeJudgment() {
+export function useFinalizeJudgments() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (params: {
       sessionId: string;
       overrides?: Record<string, boolean>;
     }) => {
-      const response = await fetch(
-        `/api/sessions/${params.sessionId}/rounds/current`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'finalize',
-            overrides: params.overrides || {}
-          }),
-        }
-      );
+      const { data, error } = await supabase
+        .rpc('finalize_judgments', {
+          p_session_id: params.sessionId,
+          p_overrides: params.overrides || {},
+        })
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to finalize judgments');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return data as RPCFunction<'finalize_judgments'>;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'players'],
       });
@@ -388,16 +339,48 @@ export function useFinalizeJudgment() {
         queryKey: ['sessions', variables.sessionId],
       });
     },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
+    },
+  });
+}
+
+/**
+ * End the game
+ * Uses direct UPDATE to set state to 'finished'
+ */
+export function useEndGame() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({ state: 'finished' })
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as TableRow<'game_sessions'>;
+    },
+    onSuccess: (data, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
+    },
   });
 }
 
 /**
  * Update game settings
- *
- * PATCH /api/sessions/[id] { action: "settings", ... }
+ * Uses direct UPDATE with state check
  */
 export function useUpdateSettings() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: async (params: {
@@ -407,27 +390,33 @@ export function useUpdateSettings() {
       enableTextInputMode: boolean;
       totalRounds: number;
     }) => {
-      const response = await fetch(`/api/sessions/${params.sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'settings',
-          allowHostToPlay: params.allowHostToPlay,
-          allowSingleUser: params.allowSingleUser,
-          enableTextInputMode: params.enableTextInputMode,
-          totalRounds: params.totalRounds,
-        }),
-      });
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .update({
+          allow_host_to_play: params.allowHostToPlay,
+          allow_single_user: params.allowSingleUser,
+          enable_text_input_mode: params.enableTextInputMode,
+          total_rounds: params.totalRounds,
+        })
+        .eq('id', params.sessionId)
+        .eq('state', 'lobby')
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update settings');
-      }
-
-      return response.json();
+      if (error) throw error;
+      return data as TableRow<'game_sessions'>;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['sessions', variables.sessionId] });
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
     },
   });
 }
+
+// Legacy exports for backward compatibility during migration
+export const useNextRound = useAdvanceRound;
+export const useRevealTrack = useRevealAnswer;
+export const useFinalizeJudgment = useFinalizeJudgments;
+export const useStartRound = useRevealAnswer; // This was for transitioning from 'reveal' to 'playing', which is now handled by advance_round

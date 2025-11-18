@@ -1,37 +1,40 @@
 /**
  * Query hooks for game session data.
  *
- * Updated to use new RESTful API structure.
+ * Uses Supabase-native approach with direct queries and postgres_changes realtime.
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Tables } from '@/lib/types/database';
+import type { TableRow } from '@/lib/types/database-helpers';
 
-type GameSession = Tables<'game_sessions'>;
-type Player = Tables<'players'>;
-type GameRound = Tables<'game_rounds'>;
+type GameSession = TableRow<'game_sessions'>;
+type Player = TableRow<'players'>;
+type GameRound = TableRow<'game_rounds'>;
 
 /**
  * Fetch a game session with real-time updates.
  *
- * GET /api/sessions/[id]
+ * Uses direct Supabase query
  */
 export function useGameSession(sessionId: string | null) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   const query = useQuery({
     queryKey: ['sessions', sessionId],
     queryFn: async () => {
       if (!sessionId) return null;
 
-      const response = await fetch(`/api/sessions/${sessionId}`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch game session');
-      }
-      return response.json() as Promise<GameSession>;
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (error) throw error;
+      return data as GameSession;
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
@@ -69,22 +72,25 @@ export function useGameSession(sessionId: string | null) {
 /**
  * Fetch players in a game session with real-time updates.
  *
- * GET /api/sessions/[id]/players
+ * Uses direct Supabase query
  */
 export function useGamePlayers(sessionId: string | null) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   const query = useQuery({
     queryKey: ['sessions', sessionId, 'players'],
     queryFn: async () => {
       if (!sessionId) return [];
 
-      const response = await fetch(`/api/sessions/${sessionId}/players?sort=score&order=desc`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch players');
-      }
-      return response.json() as Promise<Player[]>;
+      const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('score', { ascending: false });
+
+      if (error) throw error;
+      return data as Player[];
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
@@ -125,22 +131,25 @@ export function useGamePlayers(sessionId: string | null) {
 /**
  * Fetch game rounds with real-time updates.
  *
- * GET /api/sessions/[id]/rounds
+ * Uses direct Supabase query
  */
 export function useGameRounds(sessionId: string | null) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   const query = useQuery({
     queryKey: ['sessions', sessionId, 'rounds'],
     queryFn: async () => {
       if (!sessionId) return [];
 
-      const response = await fetch(`/api/sessions/${sessionId}/rounds`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch rounds');
-      }
-      return response.json() as Promise<GameRound[]>;
+      const { data, error } = await supabase
+        .from('game_rounds')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('round_number', { ascending: true });
+
+      if (error) throw error;
+      return data as GameRound[];
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates

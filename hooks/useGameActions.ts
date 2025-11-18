@@ -15,12 +15,12 @@ import {
   type HostAction,
   type PlayerAction,
 } from '@/lib/game/state-machine';
-import type { Tables } from '@/lib/types/database';
+import type { TableRow } from '@/lib/types/database-helpers';
 
-type GameSession = Tables<'game_sessions'>;
-type Player = Tables<'players'>;
-type GameRound = Tables<'game_rounds'>;
-type RoundAnswer = Tables<'round_answers'>;
+type GameSession = TableRow<'game_sessions'>;
+type Player = TableRow<'players'>;
+type GameRound = TableRow<'game_rounds'>;
+type RoundAnswer = TableRow<'round_answers'>;
 
 interface UseGameActionsOptions {
   role: Role;

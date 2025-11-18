@@ -292,12 +292,70 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_round: {
+        Args: {
+          p_session_id: string
+        }
+        Returns: {
+          session_id: string
+          new_state: string
+          new_round: number
+          track_id: string
+        }[]
+      }
+      finalize_judgments: {
+        Args: {
+          p_session_id: string
+          p_overrides?: Json
+        }
+        Returns: {
+          success: boolean
+          leaderboard: Json
+        }[]
+      }
       increment_player_score: {
         Args: {
           player_id: string
           points: number
         }
         Returns: undefined
+      }
+      judge_answer: {
+        Args: {
+          p_session_id: string
+          p_correct: boolean
+        }
+        Returns: {
+          round_id: string
+          buzzer_player_id: string
+          correct: boolean
+          points_awarded: number
+          new_player_score: number
+        }[]
+      }
+      start_game: {
+        Args: {
+          p_session_id: string
+        }
+        Returns: {
+          id: string
+          state: string
+          current_round: number
+          first_track_id: string
+        }[]
+      }
+      submit_answer: {
+        Args: {
+          p_session_id: string
+          p_player_id: string
+          p_answer: string
+          p_auto_validated: boolean
+          p_points_awarded: number
+        }
+        Returns: {
+          answer_id: string
+          all_players_submitted: boolean
+        }[]
       }
     }
     Enums: {
