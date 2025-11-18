@@ -34,6 +34,16 @@ interface HostGameControllerProps {
   isEndingGame: boolean;
   spotifyPlayer: UseSpotifyPlayerReturn;
   playerError: string | null;
+  // Solo mode player controls
+  hostPlayerId?: string;
+  onSubmitAnswer?: (answer: string) => void;
+  isSubmittingAnswer?: boolean;
+  hasSubmittedAnswer?: boolean;
+  answerFeedback?: {
+    isCorrect: boolean;
+    correctAnswer: string;
+    pointsEarned: number;
+  } | null;
 }
 
 export function HostGameController(props: HostGameControllerProps) {
@@ -144,16 +154,6 @@ export function HostGameController(props: HostGameControllerProps) {
         }}
         isSpotifyReady={isReady}
       />
-
-      {/* Debug Info (remove in production) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black/80 text-white text-xs p-3 rounded-lg space-y-1">
-          <div>Player Ready: {isReady ? '✓' : '✗'}</div>
-          <div>Playing: {isPlaying ? '✓' : '✗'}</div>
-          <div>Current Track: {currentSpotifyId || 'none'}</div>
-          <div>Game State: {props.session.state}</div>
-        </div>
-      )}
     </div>
   );
 }

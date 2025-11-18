@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Music, Zap } from "lucide-react";
+import { Music, Zap, Send } from "lucide-react";
 import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
 import type { Tables } from "@/lib/types/database";
@@ -24,6 +25,15 @@ interface PlayerGameViewProps {
   isBuzzing: boolean;
   canBuzz: boolean;
   lastJudgment?: RoundJudgment | null;
+  // Text input mode props
+  onSubmitAnswer?: (answer: string) => void;
+  isSubmittingAnswer?: boolean;
+  hasSubmittedAnswer?: boolean;
+  answerFeedback?: {
+    isCorrect: boolean;
+    correctAnswer: string;
+    pointsEarned: number;
+  } | null;
 }
 
 export function PlayerGameView({
@@ -36,6 +46,10 @@ export function PlayerGameView({
   isBuzzing,
   canBuzz,
   lastJudgment,
+  onSubmitAnswer,
+  isSubmittingAnswer,
+  hasSubmittedAnswer,
+  answerFeedback,
 }: PlayerGameViewProps) {
   const currentRound = session.current_round || 0;
   const totalRounds = 10;
@@ -47,9 +61,13 @@ export function PlayerGameView({
   const currentPlayerRank = sortedPlayers.findIndex((p) => p.id === currentPlayerId) + 1;
 
   const hasBuzzed = buzzerPlayer?.id === currentPlayerId;
+  const isTextInputMode = session.enable_text_input_mode ?? false;
 
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
+
+  // Answer input state (text input mode)
+  const [answer, setAnswer] = useState('');
 
   // Trigger buzz animation when state changes to buzzed
   useEffect(() => {
@@ -85,33 +103,116 @@ export function PlayerGameView({
       {/* Buzz Button */}
       <Card className="border-2">
         <CardContent className="pt-6">
-          {/* Playing State - Show Buzz Button */}
-          {state === 'playing' && (
+          {/* Playing State - Show Buzz Button or Text Input */}
+          {state === 'playing' && !hasSubmittedAnswer && (
             <div className="space-y-4">
               <div className="text-center mb-4">
                 <Music className="h-12 w-12 mx-auto text-purple-500 animate-pulse" />
                 <p className="text-lg font-semibold mt-2">Listening...</p>
                 <p className="text-sm text-muted-foreground">
-                  Buzz when you know the song!
+                  {isTextInputMode
+                    ? "Type the artist/band name when you know it!"
+                    : "Buzz when you know the song!"}
                 </p>
               </div>
 
-              <Button
-                size="lg"
-                className="w-full h-32 text-3xl font-bold bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 active:scale-95 transition-transform"
-                onClick={onBuzz}
-                disabled={!canBuzz || isBuzzing}
-              >
-                {isBuzzing ? (
-                  "BUZZING..."
-                ) : (
-                  <>
-                    <Zap className="h-10 w-10 mr-3" />
-                    BUZZ!
-                  </>
-                )}
-              </Button>
+              {isTextInputMode ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (answer.trim() && onSubmitAnswer) {
+                      onSubmitAnswer(answer.trim());
+                      setAnswer('');
+                    }
+                  }}
+                  className="space-y-3"
+                >
+                  <Input
+                    type="text"
+                    placeholder="Enter artist/band name..."
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    disabled={isSubmittingAnswer}
+                    className="text-lg h-14"
+                    autoFocus
+                  />
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full h-14 text-xl font-bold"
+                    disabled={!answer.trim() || isSubmittingAnswer}
+                  >
+                    {isSubmittingAnswer ? (
+                      "SUBMITTING..."
+                    ) : (
+                      <>
+                        <Send className="h-6 w-6 mr-2" />
+                        SUBMIT ANSWER
+                      </>
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <Button
+                  size="lg"
+                  className="w-full h-32 text-3xl font-bold bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 active:scale-95 transition-transform"
+                  onClick={onBuzz}
+                  disabled={!canBuzz || isBuzzing}
+                >
+                  {isBuzzing ? (
+                    "BUZZING..."
+                  ) : (
+                    <>
+                      <Zap className="h-10 w-10 mr-3" />
+                      BUZZ!
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
+          )}
+
+          {/* Playing State - Answer Submitted (Text Input Mode) */}
+          {state === 'playing' && hasSubmittedAnswer && isTextInputMode && (
+            <Alert>
+              <AlertDescription>
+                <div className="text-center py-4">
+                  <p className="text-xl font-bold">Answer submitted!</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Waiting for other players...
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Submitted State - Show feedback for single player */}
+          {state === 'playing' && answerFeedback && (
+            <Alert className={`border-2 ${
+              answerFeedback.isCorrect
+                ? 'border-green-500 bg-green-50'
+                : 'border-red-500 bg-red-50'
+            }`}>
+              <AlertDescription>
+                <div className="text-center py-6">
+                  <p className={`text-4xl font-bold mb-2 ${
+                    answerFeedback.isCorrect ? 'text-green-900' : 'text-red-900'
+                  }`}>
+                    {answerFeedback.isCorrect ? '✓ CORRECT!' : '✗ INCORRECT'}
+                  </p>
+                  {!answerFeedback.isCorrect && (
+                    <p className="text-lg text-red-700 mb-2">
+                      It was: {answerFeedback.correctAnswer}
+                    </p>
+                  )}
+                  <p className={`text-2xl font-semibold ${
+                    answerFeedback.isCorrect ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {answerFeedback.pointsEarned > 0 ? '+' : ''}{answerFeedback.pointsEarned} points
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Buzzed State */}

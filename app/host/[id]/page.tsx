@@ -4,6 +4,7 @@ import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
 import { useHost } from "@/hooks/useHost";
+import { useSubmitAnswer } from "@/hooks/mutations/use-game-mutations";
 import { HostLobby } from "@/components/host/HostLobby";
 import { HostGameController } from "@/components/host/HostGameController";
 import { FinalScore } from "@/components/game/FinalScore";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
+import { useToast } from "@/hooks/use-toast";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -99,6 +101,78 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     isEndingGame,
   } = useHost(id);
 
+  const { toast } = useToast();
+
+  // Find host player (for solo mode)
+  const hostPlayer = players.find((p) => p.is_host);
+
+  // Debug: Log players and session
+  useEffect(() => {
+    console.log('Session settings:', {
+      allow_host_to_play: session?.allow_host_to_play,
+      allow_single_user: session?.allow_single_user,
+      enable_text_input_mode: session?.enable_text_input_mode,
+      state: session?.state,
+    });
+    console.log('Players:', players.map(p => ({ name: p.name, is_host: p.is_host, id: p.id })));
+    console.log('Host player:', hostPlayer);
+  }, [players, hostPlayer, session]);
+
+  // Submit answer mutation (text input mode for solo mode)
+  const submitAnswer = useSubmitAnswer();
+  const [answerFeedback, setAnswerFeedback] = useState<{
+    isCorrect: boolean;
+    correctAnswer: string;
+    pointsEarned: number;
+  } | null>(null);
+
+  // Reset answer feedback and mutation state when round changes
+  useEffect(() => {
+    setAnswerFeedback(null);
+    submitAnswer.reset();
+  }, [session?.current_round]);
+
+  const handleSubmitAnswer = (answer: string) => {
+    if (!hostPlayer) {
+      console.error('No host player found!');
+      toast({
+        title: "Error",
+        description: "Host player not found. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Submitting answer:', { answer, playerId: hostPlayer.id, sessionId: id });
+
+    submitAnswer.mutate(
+      { sessionId: id, playerId: hostPlayer.id, answer },
+      {
+        onSuccess: (data) => {
+          console.log('Submit answer success:', data);
+          // If single player mode, show immediate feedback
+          if (data.singlePlayerMode && data.isCorrect !== undefined) {
+            setAnswerFeedback({
+              isCorrect: data.isCorrect,
+              correctAnswer: data.correctAnswer,
+              pointsEarned: data.pointsEarned,
+            });
+          } else {
+            console.log('Not showing feedback. singlePlayerMode:', data.singlePlayerMode, 'isCorrect:', data.isCorrect);
+          }
+        },
+        onError: (error) => {
+          console.error('Submit answer error:', error);
+          toast({
+            title: "Failed to submit answer",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  };
+
   // Loading state
   if (isLoadingSession || isLoadingPlayers || isLoadingAuth) {
     return (
@@ -174,6 +248,11 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       isEndingGame={isEndingGame}
       spotifyPlayer={spotifyPlayer}
       playerError={playerError}
+      hostPlayerId={hostPlayer?.id}
+      onSubmitAnswer={handleSubmitAnswer}
+      isSubmittingAnswer={submitAnswer.isPending}
+      hasSubmittedAnswer={submitAnswer.isSuccess}
+      answerFeedback={answerFeedback}
     />
   );
 }

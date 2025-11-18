@@ -75,4 +75,17 @@ export type GameEvent =
         playerName: string;
         score: number;
       };
+    }
+  | {
+      type: 'all_answers_submitted';
+      roundNumber: number;
+    }
+  | {
+      type: 'answers_finalized';
+      roundNumber: number;
+      leaderboard: Array<{
+        playerId: string;
+        playerName: string;
+        score: number;
+      }>;
     };

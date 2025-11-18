@@ -90,7 +90,13 @@ export async function POST(request: Request) {
     const spotifyUser = await userResponse.json();
 
     const body = await request.json();
-    const { packId } = body;
+    const {
+      packId,
+      totalRounds = 10,
+      allowHostToPlay = false,
+      allowSingleUser = false,
+      enableTextInputMode = false,
+    } = body;
 
     if (!packId) {
       return NextResponse.json(
@@ -114,7 +120,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Pack not found' }, { status: 404 });
     }
 
-    // Create game session
+    // Create game session with settings
     const { data: gameSession, error: sessionError } = (await supabase
       .from('game_sessions')
       .insert({
@@ -122,6 +128,10 @@ export async function POST(request: Request) {
         pack_id: packId,
         state: 'lobby',
         current_round: 0,
+        total_rounds: totalRounds,
+        allow_host_to_play: allowHostToPlay,
+        allow_single_user: allowSingleUser,
+        enable_text_input_mode: enableTextInputMode,
       })
       .select('*')
       .single()) as SupabaseSingleResponse<any>;

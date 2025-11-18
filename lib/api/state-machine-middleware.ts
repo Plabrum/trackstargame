@@ -46,7 +46,7 @@ export function validateStateTransition(from: GameState, to: GameState): void {
  */
 export function getNextGameState(
   currentState: GameState,
-  action: 'start' | 'buzz' | 'judge' | 'next_round' | 'finish',
+  action: 'start' | 'buzz' | 'submit' | 'judge' | 'finalize' | 'next_round' | 'finish',
   params?: { currentRound?: number; nextRound?: number; totalRounds?: number }
 ): GameState {
   const nextState = getNextState(currentState, action, params);

@@ -32,7 +32,18 @@ export async function GET(request: NextRequest) {
     // Store tokens in secure HTTP-only cookies
     const cookieStore = await cookies();
 
+    // Calculate expiration timestamp
+    const expiresAtTimestamp = Date.now() + tokens.expires_in * 1000;
+
     cookieStore.set('spotify_access_token', tokens.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: tokens.expires_in,
+    });
+
+    // Store the expiration timestamp
+    cookieStore.set('spotify_token_expires_at', expiresAtTimestamp.toString(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

@@ -17,6 +17,7 @@ interface SpotifyPlaybackControlsProps {
   onPlayPause?: () => void;
   onVolumeChange?: (volume: number) => void;
   showControls?: boolean;
+  hideTrackDetails?: boolean;
 }
 
 function formatTime(ms: number): string {
@@ -31,6 +32,7 @@ export function SpotifyPlaybackControls({
   onPlayPause,
   onVolumeChange,
   showControls = true,
+  hideTrackDetails = false,
 }: SpotifyPlaybackControlsProps) {
   const [volume, setVolume] = useState(80);
   const [localPosition, setLocalPosition] = useState(0);
@@ -67,7 +69,7 @@ export function SpotifyPlaybackControls({
       <CardContent className="p-4">
         <div className="flex gap-4">
           {/* Album Art */}
-          {track.albumArt && (
+          {track.albumArt && !hideTrackDetails && (
             <div className="flex-shrink-0">
               <img
                 src={track.albumArt}
@@ -80,14 +82,16 @@ export function SpotifyPlaybackControls({
           {/* Track Info and Controls */}
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {/* Track Name & Artist */}
-            <div className="mb-2">
-              <h3 className="font-semibold text-sm truncate">
-                {track.name}
-              </h3>
-              <p className="text-xs text-muted-foreground truncate">
-                {track.artists}
-              </p>
-            </div>
+            {!hideTrackDetails && (
+              <div className="mb-2">
+                <h3 className="font-semibold text-sm truncate">
+                  {track.name}
+                </h3>
+                <p className="text-xs text-muted-foreground truncate">
+                  {track.artists}
+                </p>
+              </div>
+            )}
 
             {/* Progress Bar */}
             <div className="space-y-1">

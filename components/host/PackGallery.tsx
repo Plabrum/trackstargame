@@ -37,7 +37,7 @@ export function PackGallery() {
       onSuccess: (response) => {
         // Check if response is successful (status 200)
         if (response.status === 200) {
-          router.push(`/host/${response.data.id}/settings`);
+          router.push(`/host/${response.data.id}`);
         }
       },
       onError: (error) => {

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, XCircle, Music } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CheckCircle2, XCircle, Music, Send } from "lucide-react";
 import { BuzzAnimation } from "@/components/game/BuzzAnimation";
 import { AnimatedScore } from "@/components/game/ScoreAnimation";
 import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
@@ -15,6 +16,8 @@ import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
+
+type RoundAnswer = Tables<'round_answers'>;
 
 interface HostGameViewProps {
   session: GameSession;
@@ -36,6 +39,20 @@ interface HostGameViewProps {
   onPlayPause?: () => void;
   onVolumeChange?: (volume: number) => void;
   isSpotifyReady?: boolean;
+  // Text input mode props
+  submittedAnswers?: RoundAnswer[];
+  onFinalizeJudgment?: (overrides?: Record<string, boolean>) => void;
+  isFinalizing?: boolean;
+  // Solo mode player controls
+  hostPlayerId?: string;
+  onSubmitAnswer?: (answer: string) => void;
+  isSubmittingAnswer?: boolean;
+  hasSubmittedAnswer?: boolean;
+  answerFeedback?: {
+    isCorrect: boolean;
+    correctAnswer: string;
+    pointsEarned: number;
+  } | null;
 }
 
 export function HostGameView({
@@ -57,6 +74,14 @@ export function HostGameView({
   onPlayPause,
   onVolumeChange,
   isSpotifyReady,
+  submittedAnswers,
+  onFinalizeJudgment,
+  isFinalizing,
+  hostPlayerId,
+  onSubmitAnswer,
+  isSubmittingAnswer,
+  hasSubmittedAnswer,
+  answerFeedback,
 }: HostGameViewProps) {
   const currentRound = session.current_round || 0;
   const totalRounds = session.total_rounds;
@@ -67,6 +92,12 @@ export function HostGameView({
 
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
+
+  // Answer judgment overrides (for text input mode)
+  const [judgmentOverrides, setJudgmentOverrides] = useState<Record<string, boolean>>({});
+
+  // Answer input state (solo mode)
+  const [answer, setAnswer] = useState('');
 
   // Trigger buzz animation when state changes to buzzed
   useEffect(() => {
@@ -92,9 +123,16 @@ export function HostGameView({
           <p className="text-muted-foreground">Host Controls</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Debug: Game Mode */}
+          <Badge variant="secondary" className="text-sm px-3 py-1">
+            {session.allow_single_user ? 'Solo Mode' : 'Party Mode'}
+            {session.enable_text_input_mode && ' + Text Input'}
+            {hostPlayerId && ' | Host Player: ✓'}
+          </Badge>
           <Badge variant="outline" className="text-lg px-4 py-2">
             {state === 'playing' && 'Playing'}
             {state === 'buzzed' && 'Buzzed!'}
+            {state === 'submitted' && 'Answers Submitted'}
             {state === 'reveal' && 'Revealed'}
           </Badge>
           {onEndGame && (
@@ -126,14 +164,69 @@ export function HostGameView({
               {/* Playing State */}
               {state === 'playing' && (
                 <div className="space-y-4">
-                  <Alert>
-                    <AlertDescription className="text-center py-4">
-                      <p className="text-lg font-semibold">Music is playing...</p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Waiting for a player to buzz in
-                      </p>
-                    </AlertDescription>
-                  </Alert>
+                  {session.allow_single_user && session.enable_text_input_mode && hasSubmittedAnswer ? (
+                    <Alert>
+                      <AlertDescription className="text-center py-4">
+                        <p className="text-xl font-bold">Answer submitted!</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Processing your answer...
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert>
+                      <AlertDescription className="text-center py-4">
+                        <p className="text-lg font-semibold">Music is playing...</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {session.enable_text_input_mode
+                            ? session.allow_single_user
+                              ? "Type the artist/band name when you know it!"
+                              : "Waiting for players to submit answers"
+                            : "Waiting for a player to buzz in"}
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Text input for solo mode */}
+                  {session.allow_single_user && session.enable_text_input_mode && !hasSubmittedAnswer && !answerFeedback && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (answer.trim() && onSubmitAnswer) {
+                          onSubmitAnswer(answer.trim());
+                          setAnswer('');
+                        }
+                      }}
+                      className="space-y-3"
+                    >
+                      <Input
+                        type="text"
+                        placeholder="Enter artist/band name..."
+                        value={answer}
+                        onChange={(e) => setAnswer(e.target.value)}
+                        disabled={isSubmittingAnswer}
+                        className="text-lg h-14"
+                        autoFocus
+                      />
+                      <Button
+                        type="submit"
+                        size="lg"
+                        className="w-full h-14 text-xl font-bold"
+                        disabled={!answer.trim() || isSubmittingAnswer}
+                      >
+                        {isSubmittingAnswer ? (
+                          "SUBMITTING..."
+                        ) : (
+                          <>
+                            <Send className="h-6 w-6 mr-2" />
+                            SUBMIT ANSWER
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  )}
+
                   {onRevealTrack && (
                     <Button
                       size="lg"
@@ -186,9 +279,112 @@ export function HostGameView({
                 </div>
               )}
 
+              {/* Submitted State - Review Answers (Text Input Mode) */}
+              {state === 'submitted' && submittedAnswers && (
+                <div className="space-y-4">
+                  <Alert className="border-blue-500 bg-blue-50">
+                    <AlertDescription>
+                      <div className="text-center py-2">
+                        <p className="text-xl font-bold text-blue-900">All answers submitted!</p>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Review answers below and override if needed
+                        </p>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Answer Review Table */}
+                  <div className="space-y-2">
+                    {submittedAnswers.map((answer) => {
+                      const player = players.find(p => p.id === answer.player_id);
+                      const finalJudgment = judgmentOverrides[answer.player_id] ?? answer.auto_validated;
+
+                      return (
+                        <Card key={answer.id} className={`${
+                          finalJudgment
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-red-300 bg-red-50'
+                        }`}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="font-bold">{player?.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Answer: <span className="font-medium text-foreground">{answer.submitted_answer}</span>
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Auto-validated: {answer.auto_validated ? '✓ Correct' : '✗ Incorrect'}
+                                  {(answer.points_awarded ?? 0) > 0 && ` (+${answer.points_awarded} pts)`}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={finalJudgment ? "default" : "outline"}
+                                  className={finalJudgment ? "bg-green-600 hover:bg-green-700" : ""}
+                                  onClick={() => setJudgmentOverrides(prev => ({
+                                    ...prev,
+                                    [answer.player_id]: true
+                                  }))}
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={!finalJudgment ? "destructive" : "outline"}
+                                  onClick={() => setJudgmentOverrides(prev => ({
+                                    ...prev,
+                                    [answer.player_id]: false
+                                  }))}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => onFinalizeJudgment?.(judgmentOverrides)}
+                    disabled={isFinalizing}
+                  >
+                    {isFinalizing ? "Finalizing..." : "Finalize & Reveal"}
+                  </Button>
+                </div>
+              )}
+
               {/* Reveal State */}
               {state === 'reveal' && (
                 <div className="space-y-4">
+                  {/* Solo mode feedback */}
+                  {session.allow_single_user && session.enable_text_input_mode && answerFeedback && (
+                    <Alert className={`border-2 ${
+                      answerFeedback.isCorrect
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-red-500 bg-red-50'
+                    }`}>
+                      <AlertDescription>
+                        <div className="text-center py-6">
+                          <p className={`text-4xl font-bold mb-2 ${
+                            answerFeedback.isCorrect ? 'text-green-900' : 'text-red-900'
+                          }`}>
+                            {answerFeedback.isCorrect ? '✓ CORRECT!' : '✗ INCORRECT'}
+                          </p>
+                          <p className={`text-2xl font-semibold ${
+                            answerFeedback.isCorrect ? 'text-green-700' : 'text-red-700'
+                          }`}>
+                            {answerFeedback.pointsEarned > 0 ? '+' : ''}{answerFeedback.pointsEarned} points
+                          </p>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {currentTrack ? (
                     <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-2">Track Revealed</p>
@@ -209,8 +405,8 @@ export function HostGameView({
                   <Button
                     size="lg"
                     className="w-full"
-                    onClick={onNextRound}
-                    disabled={isAdvancing}
+                    onClick={currentRound >= totalRounds ? onEndGame : onNextRound}
+                    disabled={isAdvancing || isEndingGame}
                   >
                     {currentRound >= totalRounds ? "Finish Game" : "Next Round"}
                   </Button>
@@ -227,6 +423,7 @@ export function HostGameView({
               onPlayPause={onPlayPause}
               onVolumeChange={onVolumeChange}
               showControls={true}
+              hideTrackDetails={session.allow_host_to_play}
             />
           )}
 

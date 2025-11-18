@@ -5,13 +5,14 @@
  */
 
 // Game states
-export type GameState = 'lobby' | 'playing' | 'buzzed' | 'reveal' | 'finished';
+export type GameState = 'lobby' | 'playing' | 'buzzed' | 'submitted' | 'reveal' | 'finished';
 
 // State transitions mapping
 const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
   lobby: ['playing', 'finished'], // first round starts or game ends early
-  playing: ['buzzed', 'reveal', 'finished'], // buzzed if someone buzzes, reveal if no buzz/timeout, or host ends game
+  playing: ['buzzed', 'submitted', 'reveal', 'finished'], // buzzed if someone buzzes, submitted if all submit answers, reveal if no buzz/timeout, or host ends game
   buzzed: ['reveal', 'finished'], // host judges or ends game
+  submitted: ['reveal', 'finished'], // host finalizes judgments or ends game
   reveal: ['playing', 'finished'], // next round starts, finished if game over
   finished: [], // Terminal state
 };
@@ -20,7 +21,7 @@ const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
  * Type guard to check if a string is a valid GameState.
  */
 export function isGameState(state: string): state is GameState {
-  return ['lobby', 'playing', 'buzzed', 'reveal', 'finished'].includes(state);
+  return ['lobby', 'playing', 'buzzed', 'submitted', 'reveal', 'finished'].includes(state);
 }
 
 /**
@@ -80,7 +81,7 @@ export function isValidRound(roundNumber: number): boolean {
  */
 export function getNextState(
   currentState: GameState,
-  action: 'start' | 'buzz' | 'judge' | 'next_round' | 'finish',
+  action: 'start' | 'buzz' | 'submit' | 'judge' | 'finalize' | 'next_round' | 'finish',
   params?: { currentRound?: number; nextRound?: number; totalRounds?: number }
 ): GameState {
   switch (action) {
@@ -93,10 +94,20 @@ export function getNextState(
       if (currentState === 'playing') return 'buzzed';
       break;
 
+    case 'submit':
+      // All players have submitted answers (text input mode)
+      if (currentState === 'playing') return 'submitted';
+      break;
+
     case 'judge':
       if (currentState === 'buzzed') return 'reveal';
       // Allow host to reveal without buzz (timeout case)
       if (currentState === 'playing') return 'reveal';
+      break;
+
+    case 'finalize':
+      // Host finalizes judgments after all answers submitted
+      if (currentState === 'submitted') return 'reveal';
       break;
 
     case 'next_round':

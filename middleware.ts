@@ -16,40 +16,20 @@ import { refreshSpotifyToken } from './lib/spotify-auth';
  */
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
 
-/**
- * Check if a JWT token is expired (or close to expiring) by decoding it
- */
-function isTokenExpired(token: string): boolean {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return true;
-
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-
-    const payload = JSON.parse(jsonPayload);
-    if (!payload.exp) return true;
-
-    return payload.exp * 1000 - REFRESH_BUFFER_MS < Date.now();
-  } catch (error) {
-    console.error('[Middleware] Failed to decode token:', error);
-    return true;
-  }
-}
-
 export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get('spotify_access_token')?.value;
   const refreshToken = request.cookies.get('spotify_refresh_token')?.value;
+  const expiresAt = request.cookies.get('spotify_token_expires_at')?.value;
+
+  // Check if token is expired based on stored expiration time
+  const isExpired = expiresAt
+    ? parseInt(expiresAt) - REFRESH_BUFFER_MS < Date.now()
+    : true; // If no expiration time, assume expired
 
   // If no access token but have refresh token, try to refresh
   // If access token exists and is expired, try to refresh
   const needsRefresh = (!accessToken && refreshToken) ||
-                       (accessToken && refreshToken && isTokenExpired(accessToken));
+                       (accessToken && refreshToken && isExpired);
 
   if (needsRefresh && refreshToken) {
     try {
@@ -59,7 +39,18 @@ export async function middleware(request: NextRequest) {
       // Create response and set new cookies
       const response = NextResponse.next();
 
+      // Calculate expiration timestamp
+      const expiresAtTimestamp = Date.now() + tokens.expires_in * 1000;
+
       response.cookies.set('spotify_access_token', tokens.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: tokens.expires_in,
+      });
+
+      // Store the expiration timestamp
+      response.cookies.set('spotify_token_expires_at', expiresAtTimestamp.toString(), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -89,6 +80,7 @@ export async function middleware(request: NextRequest) {
       // Clear invalid cookies
       response.cookies.delete('spotify_access_token');
       response.cookies.delete('spotify_refresh_token');
+      response.cookies.delete('spotify_token_expires_at');
 
       return response;
     }

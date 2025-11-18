@@ -20,7 +20,14 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <QueryProvider>
-          {children}
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1">
+              {children}
+            </main>
+            <footer className="py-4 text-center text-sm text-muted-foreground border-t">
+              Made by Phil Labrum © 2025
+            </footer>
+          </div>
           <Toaster />
         </QueryProvider>
       </body>

@@ -4,7 +4,7 @@ import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
-import { useJoinSession } from "@/hooks/mutations/use-game-mutations";
+import { useJoinSession, useSubmitAnswer } from "@/hooks/mutations/use-game-mutations";
 import { usePlayer } from "@/hooks/usePlayer";
 import { PlayerLobby } from "@/components/game/PlayerLobby";
 import { PlayerGameView } from "@/components/game/PlayerGameView";
@@ -57,6 +57,19 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   // Player controls
   const { buzz, isBuzzing, lastJudgment } = usePlayer(id, playerId);
 
+  // Submit answer mutation (text input mode)
+  const submitAnswer = useSubmitAnswer();
+  const [answerFeedback, setAnswerFeedback] = useState<{
+    isCorrect: boolean;
+    correctAnswer: string;
+    pointsEarned: number;
+  } | null>(null);
+
+  // Reset answer feedback when round changes
+  useEffect(() => {
+    setAnswerFeedback(null);
+  }, [session?.current_round]);
+
   const handleJoin = (playerName: string) => {
     joinSession.mutate(
       { sessionId: id, playerName },
@@ -68,6 +81,33 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
         onError: (error) => {
           toast({
             title: "Failed to join",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  };
+
+  const handleSubmitAnswer = (answer: string) => {
+    if (!playerId) return;
+
+    submitAnswer.mutate(
+      { sessionId: id, playerId, answer },
+      {
+        onSuccess: (data) => {
+          // If single player mode, show immediate feedback
+          if (data.singlePlayerMode && data.isCorrect !== undefined) {
+            setAnswerFeedback({
+              isCorrect: data.isCorrect,
+              correctAnswer: data.correctAnswer,
+              pointsEarned: data.pointsEarned,
+            });
+          }
+        },
+        onError: (error) => {
+          toast({
+            title: "Failed to submit answer",
             description: error.message,
             variant: "destructive",
           });
@@ -163,6 +203,10 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       isBuzzing={isBuzzing}
       canBuzz={canBuzz}
       lastJudgment={lastJudgment}
+      onSubmitAnswer={handleSubmitAnswer}
+      isSubmittingAnswer={submitAnswer.isPending}
+      hasSubmittedAnswer={submitAnswer.isSuccess}
+      answerFeedback={answerFeedback}
     />
   );
 }

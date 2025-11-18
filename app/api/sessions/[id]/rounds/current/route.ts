@@ -70,6 +70,7 @@ export async function GET(
  * Actions:
  * - "judge": Judge the answer (correct: boolean)
  * - "reveal": Reveal the track
+ * - "finalize": Finalize judgments after all answers submitted (text input mode)
  */
 export async function PATCH(
   request: Request,
@@ -272,9 +273,106 @@ export async function PATCH(
         }
       }
 
+      case 'finalize': {
+        try {
+          // Finalize judgments after all answers submitted (text input mode)
+          const { overrides } = body; // Record<player_id, boolean>
+
+          // Get current round
+          const finalizeRoundNum = session.current_round || 0;
+          const { data: round, error: roundError } = await supabase
+            .from('game_rounds')
+            .select('id')
+            .eq('session_id', sessionId)
+            .eq('round_number', finalizeRoundNum)
+            .single();
+
+          if (roundError || !round) {
+            return NextResponse.json(
+              { error: 'Round not found' },
+              { status: 400 }
+            );
+          }
+
+          // Get all submitted answers for this round
+          const { data: answers, error: answersError } = await supabase
+            .from('round_answers')
+            .select('*')
+            .eq('round_id', round.id);
+
+          if (answersError) {
+            return NextResponse.json(
+              { error: answersError.message },
+              { status: 500 }
+            );
+          }
+
+          // Apply overrides and award points
+          for (const answer of answers || []) {
+            // Check if host overrode this answer
+            const finalJudgment = overrides?.[answer.player_id] ?? answer.auto_validated;
+
+            // Update answer with final judgment
+            await supabase
+              .from('round_answers')
+              .update({
+                is_correct: finalJudgment,
+              })
+              .eq('id', answer.id);
+
+            // Award/deduct points
+            if (finalJudgment) {
+              // Award points for correct answer
+              await supabase.rpc('increment_player_score', {
+                player_id: answer.player_id,
+                points: answer.points_awarded ?? 0,
+              });
+            }
+          }
+
+          // Get next state through state machine
+          const nextState = getNextGameState(currentState, 'finalize');
+
+          // Update session state to reveal
+          await supabase
+            .from('game_sessions')
+            .update({ state: nextState })
+            .eq('id', sessionId);
+
+          // Get leaderboard
+          const { data: players } = await supabase
+            .from('players')
+            .select('id, name, score')
+            .eq('session_id', sessionId)
+            .order('score', { ascending: false });
+
+          const leaderboard = (players || []).map(p => ({
+            playerId: p.id,
+            playerName: p.name,
+            score: p.score ?? 0,
+          }));
+
+          // Broadcast finalize event with results
+          await broadcastGameEvent(sessionId, {
+            type: 'answers_finalized',
+            roundNumber: finalizeRoundNum,
+            leaderboard,
+          });
+
+          await broadcastStateChange(sessionId, nextState);
+
+          return NextResponse.json({ success: true, leaderboard });
+        } catch (error) {
+          if (error instanceof StateTransitionError || error instanceof GameRuleError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+          }
+          throw error;
+        }
+      }
+
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use "judge" or "reveal"' },
+          { error: 'Invalid action. Use "judge", "reveal", or "finalize"' },
           { status: 400 }
         );
     }

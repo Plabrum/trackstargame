@@ -8,7 +8,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { useGameChannel, type GameEventHandlers } from './useGameChannel';
-import { useStartGame, useJudgeAnswer } from './mutations/use-game-mutations';
+import { useStartGame, useJudgeAnswer, useFinalizeJudgment } from './mutations/use-game-mutations';
 
 /**
  * Advance to next round or finish game (host only).
@@ -119,6 +119,7 @@ export function useHost(
   // Mutations
   const startGame = useStartGame();
   const judgeAnswer = useJudgeAnswer();
+  const finalizeJudgment = useFinalizeJudgment();
   const nextRound = useNextRound();
   const revealTrack = useRevealTrack();
   const endGame = useEndGame();
@@ -259,9 +260,14 @@ export function useHost(
   return {
     // Host actions
     startGame: useCallback(
-      () => {
+      (settings?: {
+        totalRounds?: number;
+        allowHostToPlay?: boolean;
+        allowSingleUser?: boolean;
+        enableTextInputMode?: boolean;
+      }) => {
         if (!sessionId) throw new Error('No session ID');
-        return startGame.mutate(sessionId);
+        return startGame.mutate({ sessionId, settings });
       },
       [sessionId, startGame]
     ),
@@ -272,6 +278,14 @@ export function useHost(
         return judgeAnswer.mutate({ sessionId, correct });
       },
       [sessionId, judgeAnswer]
+    ),
+
+    finalizeJudgment: useCallback(
+      (overrides?: Record<string, boolean>) => {
+        if (!sessionId) throw new Error('No session ID');
+        return finalizeJudgment.mutate({ sessionId, overrides });
+      },
+      [sessionId, finalizeJudgment]
     ),
 
     nextRound: useCallback(
@@ -301,6 +315,7 @@ export function useHost(
     // Mutation states
     isStartingGame: startGame.isPending,
     isJudging: judgeAnswer.isPending,
+    isFinalizing: finalizeJudgment.isPending,
     isAdvancing: nextRound.isPending,
     isRevealing: revealTrack.isPending,
     isEndingGame: endGame.isPending,

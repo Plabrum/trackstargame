@@ -71,17 +71,25 @@ export function useJoinSession() {
 /**
  * Start the game (host only).
  *
- * PATCH /api/sessions/[id] { action: "start" }
+ * PATCH /api/sessions/[id] { action: "start", settings: {...} }
  */
 export function useStartGame() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sessionId: string) => {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
+    mutationFn: async (params: {
+      sessionId: string;
+      settings?: {
+        totalRounds?: number;
+        allowHostToPlay?: boolean;
+        allowSingleUser?: boolean;
+        enableTextInputMode?: boolean;
+      };
+    }) => {
+      const response = await fetch(`/api/sessions/${params.sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' }),
+        body: JSON.stringify({ action: 'start', settings: params.settings }),
       });
 
       if (!response.ok) {
@@ -91,8 +99,8 @@ export function useStartGame() {
 
       return response.json();
     },
-    onSuccess: (_, sessionId) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    onSuccess: (_, params) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', params.sessionId] });
     },
   });
 }
@@ -294,6 +302,96 @@ export function useEndGame() {
 }
 
 /**
+ * Submit an answer (text input mode).
+ *
+ * POST /api/sessions/[id]/rounds/current/submit-answer
+ */
+export function useSubmitAnswer() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      sessionId: string;
+      playerId: string;
+      answer: string
+    }) => {
+      const response = await fetch(
+        `/api/sessions/${params.sessionId}/rounds/current/submit-answer`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerId: params.playerId,
+            answer: params.answer
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit answer');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId, 'rounds'],
+      });
+    },
+  });
+}
+
+/**
+ * Finalize judgments after all answers submitted (host only).
+ *
+ * PATCH /api/sessions/[id]/rounds/current { action: "finalize", overrides: {...} }
+ */
+export function useFinalizeJudgment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      sessionId: string;
+      overrides?: Record<string, boolean>;
+    }) => {
+      const response = await fetch(
+        `/api/sessions/${params.sessionId}/rounds/current`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'finalize',
+            overrides: params.overrides || {}
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to finalize judgments');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId, 'players'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId, 'rounds'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId],
+      });
+    },
+  });
+}
+
+/**
  * Update game settings
  *
  * PATCH /api/sessions/[id] { action: "settings", ... }
@@ -306,6 +404,7 @@ export function useUpdateSettings() {
       sessionId: string;
       allowHostToPlay: boolean;
       allowSingleUser: boolean;
+      enableTextInputMode: boolean;
       totalRounds: number;
     }) => {
       const response = await fetch(`/api/sessions/${params.sessionId}`, {
@@ -315,6 +414,7 @@ export function useUpdateSettings() {
           action: 'settings',
           allowHostToPlay: params.allowHostToPlay,
           allowSingleUser: params.allowSingleUser,
+          enableTextInputMode: params.enableTextInputMode,
           totalRounds: params.totalRounds,
         }),
       });

@@ -99,10 +99,13 @@ export async function PATCH(
     const body = await request.json();
     const { action } = body;
 
+    console.log('[PATCH /api/sessions/[id]] Action:', action, 'Body:', body);
+
     const supabase = await createClient();
 
     switch (action) {
       case 'start': {
+        console.log('[Start Game] Starting game for session:', sessionId);
         // Get session and validate
         const { data: session, error: sessionError } = await supabase
           .from('game_sessions')
@@ -114,7 +117,96 @@ export async function PATCH(
           return NextResponse.json({ error: 'Session not found' }, { status: 404 });
         }
 
-        // Get player count
+        // Apply settings if provided
+        if (body.settings) {
+          const { totalRounds, allowHostToPlay, allowSingleUser, enableTextInputMode } = body.settings;
+
+          const settingsUpdate: any = {};
+          if (totalRounds !== undefined) settingsUpdate.total_rounds = totalRounds;
+          if (allowHostToPlay !== undefined) settingsUpdate.allow_host_to_play = allowHostToPlay;
+          if (allowSingleUser !== undefined) settingsUpdate.allow_single_user = allowSingleUser;
+          if (enableTextInputMode !== undefined) settingsUpdate.enable_text_input_mode = enableTextInputMode;
+
+          const { error: updateError } = await supabase
+            .from('game_sessions')
+            .update(settingsUpdate)
+            .eq('id', sessionId);
+
+          if (updateError) {
+            return NextResponse.json({ error: updateError.message }, { status: 500 });
+          }
+
+          // Refresh session data with updated settings
+          const { data: updatedSessionData } = await supabase
+            .from('game_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+
+          if (updatedSessionData) {
+            Object.assign(session, updatedSessionData);
+          }
+
+          // Handle host player creation/removal based on allowHostToPlay
+          console.log('[Start Game] allowHostToPlay:', allowHostToPlay);
+          if (allowHostToPlay) {
+            console.log('[Start Game] Creating/checking host player for:', session.host_name);
+            const { data: existingHostPlayer } = await supabase
+              .from('players')
+              .select('id')
+              .eq('session_id', sessionId)
+              .eq('name', session.host_name)
+              .single();
+
+            console.log('[Start Game] Existing host player:', existingHostPlayer);
+
+            if (!existingHostPlayer) {
+              console.log('[Start Game] Creating new host player');
+              const { data: newPlayer, error: playerError } = await supabase
+                .from('players')
+                .insert({
+                  session_id: sessionId,
+                  name: session.host_name,
+                  score: 0,
+                  is_host: true,
+                })
+                .select()
+                .single();
+
+              console.log('[Start Game] Created host player:', newPlayer, 'Error:', playerError);
+
+              if (newPlayer) {
+                await broadcastGameEvent(sessionId, {
+                  type: 'player_joined',
+                  playerId: newPlayer.id,
+                  playerName: session.host_name,
+                });
+              }
+            }
+          } else {
+            const { data: hostPlayer } = await supabase
+              .from('players')
+              .select('id')
+              .eq('session_id', sessionId)
+              .eq('name', session.host_name)
+              .single();
+
+            if (hostPlayer) {
+              await supabase
+                .from('players')
+                .delete()
+                .eq('id', hostPlayer.id);
+
+              await broadcastGameEvent(sessionId, {
+                type: 'player_left',
+                playerId: hostPlayer.id,
+                playerName: session.host_name,
+              });
+            }
+          }
+        }
+
+        // Get player count (after settings have potentially added/removed host)
         const { count: playerCount } = await supabase
           .from('players')
           .select('*', { count: 'exact', head: true })
@@ -294,7 +386,7 @@ export async function PATCH(
           );
         }
 
-        const { allowHostToPlay, allowSingleUser, totalRounds } = body;
+        const { allowHostToPlay, allowSingleUser, enableTextInputMode, totalRounds } = body;
 
         // Validate settings
         if (typeof totalRounds !== 'number' || totalRounds < 1 || totalRounds > 50) {
@@ -310,6 +402,7 @@ export async function PATCH(
           .update({
             allow_host_to_play: allowHostToPlay,
             allow_single_user: allowSingleUser,
+            enable_text_input_mode: enableTextInputMode,
             total_rounds: totalRounds,
           })
           .eq('id', sessionId)
@@ -338,6 +431,7 @@ export async function PATCH(
                 session_id: sessionId,
                 name: session.host_name,
                 score: 0,
+                is_host: true,
               })
               .select()
               .single();
