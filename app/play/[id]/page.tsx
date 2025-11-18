@@ -12,6 +12,8 @@ import { FinalScore } from "@/components/game/FinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { fuzzyMatch } from "@/lib/game/fuzzy-match";
+import { calculatePoints } from "@/lib/game/state-machine";
 
 export default function PlayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -55,7 +57,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   const joinSession = useJoinSession();
 
   // Player controls
-  const { buzz, isBuzzing, lastJudgment } = usePlayer(id, playerId);
+  const { buzz, isBuzzing } = usePlayer(id, playerId, session?.current_round);
 
   // Submit answer mutation (text input mode)
   const submitAnswer = useSubmitAnswer();
@@ -74,9 +76,9 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     joinSession.mutate(
       { sessionId: id, playerName },
       {
-        onSuccess: (newPlayerId) => {
-          setPlayerId(newPlayerId);
-          localStorage.setItem(`player_${id}`, newPlayerId);
+        onSuccess: (player) => {
+          setPlayerId(player.id);
+          localStorage.setItem(`player_${id}`, player.id);
         },
         onError: (error) => {
           toast({
@@ -89,21 +91,45 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     );
   };
 
-  const handleSubmitAnswer = (answer: string) => {
-    if (!playerId) return;
+  const handleSubmitAnswer = async (answer: string) => {
+    if (!playerId || !currentTrack || !session) return;
+
+    // Calculate elapsed time
+    const roundStartTime = session.round_start_time;
+    if (!roundStartTime) {
+      toast({
+        title: "Error",
+        description: "Round has not started yet",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const elapsedMs = Date.now() - new Date(roundStartTime).getTime();
+    const elapsedSeconds = elapsedMs / 1000;
+
+    // Auto-validate answer using fuzzy matching
+    const autoValidated = fuzzyMatch(answer, currentTrack.artist, 80);
+
+    // Calculate points if correct
+    const pointsAwarded = autoValidated ? calculatePoints(elapsedSeconds, true) : 0;
 
     submitAnswer.mutate(
-      { sessionId: id, playerId, answer },
+      {
+        sessionId: id,
+        playerId,
+        answer,
+        autoValidated,
+        pointsAwarded,
+      },
       {
         onSuccess: (data) => {
-          // If single player mode, show immediate feedback
-          if (data.singlePlayerMode && data.isCorrect !== undefined) {
-            setAnswerFeedback({
-              isCorrect: data.isCorrect,
-              correctAnswer: data.correctAnswer,
-              pointsEarned: data.pointsEarned,
-            });
-          }
+          // Show feedback
+          setAnswerFeedback({
+            isCorrect: autoValidated,
+            correctAnswer: currentTrack.artist,
+            pointsEarned: pointsAwarded,
+          });
         },
         onError: (error) => {
           toast({
@@ -202,7 +228,15 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       buzzerPlayer={buzzerPlayer}
       onBuzz={buzz}
       isBuzzing={isBuzzing}
-      lastJudgment={lastJudgment}
+      roundJudgment={
+        currentRound?.buzzer_player_id === playerId && currentRound?.correct !== null
+          ? {
+              playerId: currentRound.buzzer_player_id,
+              correct: currentRound.correct,
+              pointsAwarded: currentRound.points_awarded ?? 0,
+            }
+          : null
+      }
       onSubmitAnswer={handleSubmitAnswer}
       isSubmittingAnswer={submitAnswer.isPending}
       hasSubmittedAnswer={submitAnswer.isSuccess}

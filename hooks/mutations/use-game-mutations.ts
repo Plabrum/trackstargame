@@ -66,7 +66,6 @@ export function useJoinSession() {
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'players'],
       });
-      return data.id;
     },
     onError: (error: Error) => {
       throw new Error(translateDBError(error));

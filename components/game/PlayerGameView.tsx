@@ -16,7 +16,12 @@ import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
 import { PlayerActionsPanel } from "./PlayerActionsPanel";
 import type { Tables } from "@/lib/types/database";
-import type { RoundJudgment } from "@/hooks/usePlayer";
+
+type RoundJudgment = {
+  playerId: string;
+  correct: boolean;
+  pointsAwarded: number;
+};
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
@@ -31,7 +36,7 @@ interface PlayerGameViewProps {
   buzzerPlayer?: Player | null;
   onBuzz: () => void;
   isBuzzing: boolean;
-  lastJudgment?: RoundJudgment | null;
+  roundJudgment?: RoundJudgment | null;
 
   // Text input mode props
   onSubmitAnswer?: (answer: string) => void;
@@ -53,7 +58,7 @@ export function PlayerGameView({
   buzzerPlayer,
   onBuzz,
   isBuzzing,
-  lastJudgment,
+  roundJudgment,
   onSubmitAnswer,
   isSubmittingAnswer,
   hasSubmittedAnswer,
@@ -193,23 +198,23 @@ export function PlayerGameView({
         return (
           <div className="space-y-4">
             {/* Judgment Feedback - Show if this player was judged */}
-            {lastJudgment && lastJudgment.playerId === currentPlayerId && (
+            {roundJudgment && roundJudgment.playerId === currentPlayerId && (
               <Alert className={`border-2 ${
-                lastJudgment.correct
+                roundJudgment.correct
                   ? 'border-green-500 bg-green-50'
                   : 'border-red-500 bg-red-50'
               }`}>
                 <AlertDescription>
                   <div className="text-center py-6">
                     <p className={`text-4xl font-bold mb-2 ${
-                      lastJudgment.correct ? 'text-green-900' : 'text-red-900'
+                      roundJudgment.correct ? 'text-green-900' : 'text-red-900'
                     }`}>
-                      {lastJudgment.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
+                      {roundJudgment.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
                     </p>
                     <p className={`text-2xl font-semibold ${
-                      lastJudgment.correct ? 'text-green-700' : 'text-red-700'
+                      roundJudgment.correct ? 'text-green-700' : 'text-red-700'
                     }`}>
-                      {lastJudgment.pointsAwarded > 0 ? '+' : ''}{lastJudgment.pointsAwarded} points
+                      {roundJudgment.pointsAwarded > 0 ? '+' : ''}{roundJudgment.pointsAwarded} points
                     </p>
                   </div>
                 </AlertDescription>

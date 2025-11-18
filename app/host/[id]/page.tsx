@@ -13,6 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { useToast } from "@/hooks/use-toast";
+import { fuzzyMatch } from "@/lib/game/fuzzy-match";
+import { calculatePoints } from "@/lib/game/state-machine";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -132,34 +134,62 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     submitAnswer.reset();
   }, [session?.current_round]);
 
-  const handleSubmitAnswer = (answer: string) => {
-    if (!hostPlayer) {
-      console.error('No host player found!');
+  const handleSubmitAnswer = async (answer: string) => {
+    if (!hostPlayer || !currentTrack || !session) {
+      console.error('Missing required data:', { hostPlayer, currentTrack, session });
       toast({
         title: "Error",
-        description: "Host player not found. Please refresh the page.",
+        description: "Missing required data. Please refresh the page.",
         variant: "destructive",
       });
       return;
     }
 
-    console.log('Submitting answer:', { answer, playerId: hostPlayer.id, sessionId: id });
+    // Calculate elapsed time
+    const roundStartTime = session.round_start_time;
+    if (!roundStartTime) {
+      toast({
+        title: "Error",
+        description: "Round has not started yet",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const elapsedMs = Date.now() - new Date(roundStartTime).getTime();
+    const elapsedSeconds = elapsedMs / 1000;
+
+    // Auto-validate answer using fuzzy matching
+    const autoValidated = fuzzyMatch(answer, currentTrack.artist, 80);
+
+    // Calculate points if correct
+    const pointsAwarded = autoValidated ? calculatePoints(elapsedSeconds, true) : 0;
+
+    console.log('Submitting answer:', {
+      answer,
+      playerId: hostPlayer.id,
+      sessionId: id,
+      autoValidated,
+      pointsAwarded,
+    });
 
     submitAnswer.mutate(
-      { sessionId: id, playerId: hostPlayer.id, answer },
+      {
+        sessionId: id,
+        playerId: hostPlayer.id,
+        answer,
+        autoValidated,
+        pointsAwarded,
+      },
       {
         onSuccess: (data) => {
           console.log('Submit answer success:', data);
-          // If single player mode, show immediate feedback
-          if (data.singlePlayerMode && data.isCorrect !== undefined) {
-            setAnswerFeedback({
-              isCorrect: data.isCorrect,
-              correctAnswer: data.correctAnswer,
-              pointsEarned: data.pointsEarned,
-            });
-          } else {
-            console.log('Not showing feedback. singlePlayerMode:', data.singlePlayerMode, 'isCorrect:', data.isCorrect);
-          }
+          // Show feedback
+          setAnswerFeedback({
+            isCorrect: autoValidated,
+            correctAnswer: currentTrack.artist,
+            pointsEarned: pointsAwarded,
+          });
         },
         onError: (error) => {
           console.error('Submit answer error:', error);

@@ -28,7 +28,7 @@ The codebase now uses an action-based state machine (`getAvailableActions()`) th
 ## 🚀 Migration Progress Report
 
 **Last Updated:** 2025-11-18
-**Status:** Phase 1 & 2 Complete ✅ | Ready for Phase 3
+**Status:** Phase 1, 2 & 3 Complete ✅ | Ready for Phase 4
 
 ### Phase 1: Database Foundation - COMPLETED ✅
 
@@ -141,24 +141,87 @@ The codebase now uses an action-based state machine (`getAvailableActions()`) th
 - ✅ Type helpers working as expected
 - ⚠️ Components need updating in Phase 3 to fix type errors
 
-### Next Steps: Phase 3 - Component Refactoring
+### Phase 3: Component Refactoring - COMPLETED ✅
+
+**What Was Done:**
+
+1. **Updated useHost Hook** (`hooks/useHost.ts`):
+   - ✅ Removed old API route implementations (`useNextRound`, `useRevealTrack`, `useEndGame`)
+   - ✅ Replaced with Supabase-native mutation hooks:
+     - `useAdvanceRound()` - RPC function call
+     - `useRevealAnswer()` - Direct UPDATE
+     - `useEndGame()` - Direct UPDATE
+     - `useFinalizeJudgments()` - RPC function call
+   - ✅ Removed `settings` parameter from `startGame()` (settings handled via `useUpdateSettings`)
+   - ✅ All mutation calls now use correct Supabase-native signatures
+
+2. **Fixed useBuzz Parameter** (`hooks/usePlayer.ts`):
+   - ✅ Added `currentRound` parameter to `usePlayer()` hook signature
+   - ✅ Updated buzz mutation to pass `currentRound` (required for atomic null check)
+   - ✅ Added validation to ensure currentRound exists before buzzing
+   - ✅ Updated player page (`app/play/[id]/page.tsx:58`) to pass `session?.current_round`
+
+3. **Fixed useSubmitAnswer Parameters** (`app/play/[id]/page.tsx` & `app/host/[id]/page.tsx`):
+   - ✅ Added imports for `fuzzyMatch` and `calculatePoints` utilities
+   - ✅ Implemented client-side answer validation logic:
+     - Calculates elapsed time from `round_start_time`
+     - Performs fuzzy matching against track artist (80% threshold)
+     - Calculates points based on elapsed time
+   - ✅ Updated both player and host pages to pass all required parameters:
+     - `answer` - User's submitted text
+     - `autoValidated` - Result of fuzzy match
+     - `pointsAwarded` - Calculated points
+   - ✅ Updated feedback display to show validation results
+
+4. **Fixed useJoinSession Return Value** (`app/play/[id]/page.tsx:79`):
+   - ✅ Updated to handle full Player object instead of just player ID
+   - ✅ Changed `onSuccess` to access `player.id` from returned object
+   - ✅ Removed unnecessary return statement in mutation hook (`hooks/mutations/use-game-mutations.ts:69`)
+
+5. **Verification:**
+   - ✅ TypeScript compilation passes with no errors (`pnpm tsc --noEmit`)
+   - ✅ All mutation hooks properly typed
+   - ✅ Components use action-based architecture (already in place):
+     - `HostActionsPanel` with `useHostActions`
+     - `PlayerActionsPanel` with `usePlayerActions`
+     - `ActionButton` and `ActionButtonGroup` components
+
+**Files Modified:**
+- `hooks/useHost.ts` - Replaced API routes with Supabase mutations
+- `hooks/usePlayer.ts` - Added currentRound parameter
+- `hooks/mutations/use-game-mutations.ts` - Fixed useJoinSession return
+- `app/play/[id]/page.tsx` - Fixed buzz, submit answer, and join session calls
+- `app/host/[id]/page.tsx` - Fixed submit answer call with validation
+
+**Breaking Changes Resolved:**
+- ✅ `useBuzz()` now correctly requires `currentRound` parameter
+- ✅ `useSubmitAnswer()` now correctly requires `autoValidated` and `pointsAwarded`
+- ✅ `useStartGame()` no longer accepts settings parameter
+- ✅ `useJoinSession()` return value correctly handled as Player object
+- ✅ All components now call mutations with correct signatures
+
+**Type Safety:**
+- ✅ No TypeScript errors
+- ✅ All mutation calls properly typed
+- ✅ Type helpers (`TableRow`, `RPCFunction`) working correctly
+
+### Next Steps: Phase 4 - Cleanup & Testing
 
 **To Do:**
-1. Update component mutation calls to use new hook signatures
-2. Fix `useBuzz()` calls to include `currentRound` parameter
-3. Fix `useSubmitAnswer()` calls to include validation parameters
-4. Fix `useStartGame()` calls (remove settings parameter)
-5. Fix `useJoinSession()` return value handling
-6. Test full game flow end-to-end with new Supabase-native hooks
-7. Verify realtime updates work correctly
-8. Ensure error messages display properly to users
+1. Delete old API routes (mutation endpoints no longer needed)
+2. Delete manual broadcast code (`lib/game/realtime.ts`)
+3. Remove broadcast event handlers from `useHost` and `usePlayer`
+4. Full end-to-end testing of game flow
+5. Verify realtime updates via postgres_changes only
+6. Test error cases and edge conditions
 
 **Important Notes for Next Context:**
-- ✅ **Production database is fully migrated** - all RPC functions live and working
-- ✅ **New mutation hooks are production-ready** - just need component updates
-- ⚠️ **Old API routes still exist** - components currently use them (no breaking changes yet)
-- 🎯 **Next step:** Update components to use new hooks, then delete API routes in Phase 4
-- 💡 **Backward compatibility:** Legacy hook exports allow gradual migration if needed
+- ✅ **All components now use Supabase-native mutations** - old API routes no longer called
+- ✅ **Action-based architecture fully integrated** - state machine drives all UI actions
+- ✅ **Type safety verified** - no compilation errors
+- ⚠️ **Old API routes still exist** - safe to delete in Phase 4
+- ⚠️ **Manual broadcast code still exists** - safe to delete in Phase 4
+- 🎯 **Next step:** Delete old code and perform final testing
 
 ---
 

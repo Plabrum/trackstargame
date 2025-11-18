@@ -10,7 +10,12 @@ import { Music, Zap, Send } from "lucide-react";
 import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
 import type { Tables } from "@/lib/types/database";
-import type { RoundJudgment } from "@/hooks/usePlayer";
+
+type RoundJudgment = {
+  playerId: string;
+  correct: boolean;
+  pointsAwarded: number;
+};
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
