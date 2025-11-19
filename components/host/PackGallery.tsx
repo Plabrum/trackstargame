@@ -14,47 +14,82 @@ import { PackSongsSheet } from "./PackSongsSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { useGetApiPacks } from "@/lib/api/packs/packs";
-import { usePostApiSessions } from "@/lib/api/sessions/sessions";
-import type { GetApiPacks200Item } from "@/lib/api/model";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import type { Database } from "@/lib/types/database";
+
+type Pack = Database['public']['Tables']['packs']['Row'] & {
+  track_count?: number;
+};
 
 export function PackGallery() {
   const router = useRouter();
-  const [selectedPack, setSelectedPack] = useState<GetApiPacks200Item | null>(null);
+  const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [startingPackId, setStartingPackId] = useState<string | null>(null);
 
-  // Fetch all packs with track counts using orval-generated hook
-  const { data: packsResponse, isLoading, error } = useGetApiPacks({
-    include: 'track_count'
-  });
+  // Fetch all packs with track counts using direct Supabase query
+  const { data: packs, isLoading, error } = useQuery({
+    queryKey: ['packs', 'with-counts'],
+    queryFn: async () => {
+      const supabase = createClient();
 
-  const packs = packsResponse?.data;
+      const { data: packsData, error: packsError } = await supabase
+        .from('packs')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  // Create session mutation using orval-generated hook
-  const createSession = usePostApiSessions({
-    mutation: {
-      onSuccess: (response) => {
-        // Check if response is successful (status 200)
-        if (response.status === 200) {
-          router.push(`/host/${response.data.id}`);
-        }
-      },
-      onError: (error) => {
-        console.error('Failed to create session:', error);
-        setStartingPackId(null);
-      },
+      if (packsError) throw packsError;
+      if (!packsData) return [];
+
+      // Fetch track counts for each pack
+      const packsWithCounts = await Promise.all(
+        packsData.map(async (pack) => {
+          const { count } = await supabase
+            .from('tracks')
+            .select('*', { count: 'exact', head: true })
+            .eq('pack_id', pack.id);
+
+          return { ...pack, track_count: count || 0 };
+        })
+      );
+
+      return packsWithCounts;
     },
   });
 
-  const handleViewSongs = (pack: GetApiPacks200Item) => {
+  // Create session mutation using direct API call
+  const createSession = useMutation({
+    mutationFn: async (packId: string) => {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create session');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      router.push(`/host/${data.id}`);
+    },
+    onError: (error) => {
+      console.error('Failed to create session:', error);
+      setStartingPackId(null);
+    },
+  });
+
+  const handleViewSongs = (pack: Pack) => {
     setSelectedPack(pack);
     setSheetOpen(true);
   };
 
   const handleStartGame = (packId: string) => {
     setStartingPackId(packId);
-    createSession.mutate({ data: { packId } });
+    createSession.mutate(packId);
   };
 
   if (isLoading) {

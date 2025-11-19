@@ -8,7 +8,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
-import type { SupabaseSingleResponse } from '@/lib/types/supabase';
 
 /**
  * GET /api/sessions
@@ -121,7 +120,7 @@ export async function POST(request: Request) {
     }
 
     // Create game session with settings
-    const { data: gameSession, error: sessionError } = (await supabase
+    const { data: gameSession, error: sessionError } = await supabase
       .from('game_sessions')
       .insert({
         host_name: hostName,
@@ -134,7 +133,7 @@ export async function POST(request: Request) {
         enable_text_input_mode: enableTextInputMode,
       })
       .select('*')
-      .single()) as SupabaseSingleResponse<any>;
+      .single();
 
     if (sessionError || !gameSession) {
       console.error('Failed to create session:', sessionError);
