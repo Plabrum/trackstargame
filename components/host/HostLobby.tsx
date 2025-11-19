@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Users, Settings, Music, AlertTriangle } from "lucide-react";
+import { Copy, Settings, Music, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GameSettingsForm } from "@/components/host/GameSettingsForm";
+import { PlayerList } from "@/components/shared/PlayerList";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -156,47 +157,18 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
           </Card>
 
           {/* Players List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Players
-                </span>
-                <Badge variant={canStart ? "default" : "secondary"}>
-                  {players.length} / {maxPlayers}
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Waiting for players to join ({minPlayers}-{maxPlayers} required)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {players.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No players yet</p>
-                  <p className="text-sm mt-1">Waiting for players to join...</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {players.map((player, index) => (
-                    <div
-                      key={player.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-600 font-semibold">
-                          {index + 1}
-                        </div>
-                        <span className="font-medium">{player.name}</span>
-                      </div>
-                      <Badge variant="outline">Ready</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PlayerList
+            players={players}
+            title="Players"
+            description={`Waiting for players to join (${minPlayers}-${maxPlayers} required)`}
+            countBadge={
+              <Badge variant={canStart ? "default" : "secondary"}>
+                {players.length} / {maxPlayers}
+              </Badge>
+            }
+            playerBadge={() => <Badge variant="outline">Ready</Badge>}
+            emptySubtitle="Waiting for players to join..."
+          />
         </div>
       )}
 

@@ -1,8 +1,7 @@
 /**
  * Sessions API
  *
- * GET  /api/sessions - List sessions
- * POST /api/sessions - Create new session
+ * POST /api/sessions - Create new session (requires Spotify auth)
  */
 
 import { NextResponse } from 'next/server';
@@ -10,53 +9,13 @@ import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 /**
- * GET /api/sessions
- * List all sessions (for debugging/admin)
- */
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const state = searchParams.get('state');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const offset = parseInt(searchParams.get('offset') || '0');
-
-    const supabase = await createClient();
-    let query = supabase
-      .from('game_sessions')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (state) {
-      query = query.eq('state', state);
-    }
-
-    const { data: sessions, error, count } = await query;
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      sessions: sessions || [],
-      total: count || 0,
-      limit,
-      offset,
-    });
-  } catch (error) {
-    console.error('Error in GET /api/sessions:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
  * POST /api/sessions
  * Create a new game session
  *
- * Request: { packId: string }
+ * Requires Spotify authentication via httpOnly cookies.
+ * This endpoint validates the host's Spotify token and creates a game session.
+ *
+ * Request: { packId: string, totalRounds?: number, allowHostToPlay?: boolean, allowSingleUser?: boolean, enableTextInputMode?: boolean }
  * Response: { id, code, host_name, pack_id, state, current_round, ... }
  */
 export async function POST(request: Request) {

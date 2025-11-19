@@ -77,7 +77,9 @@ export function PackGallery() {
       router.push(`/host/${data.id}`);
     },
     onError: (error) => {
-      console.error('Failed to create session:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to create session:', error);
+      }
       setStartingPackId(null);
     },
   });

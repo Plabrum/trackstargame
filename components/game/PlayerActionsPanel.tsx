@@ -7,11 +7,10 @@
 
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Zap, Send } from "lucide-react";
+import { Zap } from "lucide-react";
 import { usePlayerActions } from "@/hooks/useGameActions";
+import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
 import type { PlayerAction } from "@/lib/game/state-machine";
 import type { Tables } from "@/lib/types/database";
 
@@ -48,9 +47,6 @@ export function PlayerActionsPanel({
 }: PlayerActionsPanelProps) {
   // Get available actions from state machine
   const actions = usePlayerActions(session, players, playerId, currentRound);
-
-  // Answer input state (for text input mode)
-  const [answer, setAnswer] = useState('');
 
   // Handle action execution
   const handleAction = (action: PlayerAction) => {
@@ -104,42 +100,12 @@ export function PlayerActionsPanel({
 
       {/* Submit Answer Form (Text Input Mode) */}
       {submitAnswerAction && !hasSubmittedAnswer && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (answer.trim()) {
-              onSubmitAnswer(answer.trim());
-              setAnswer('');
-            }
-          }}
-          className="space-y-3"
-        >
-          <Input
-            type="text"
-            placeholder="Enter artist/band name..."
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            disabled={!submitAnswerAction.enabled || isSubmittingAnswer}
-            className="text-lg h-14"
-            autoFocus
-          />
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full h-14 text-xl font-bold"
-            disabled={!answer.trim() || !submitAnswerAction.enabled || isSubmittingAnswer}
-            title={submitAnswerAction.description}
-          >
-            {isSubmittingAnswer ? (
-              "SUBMITTING..."
-            ) : (
-              <>
-                <Send className="h-6 w-6 mr-2" />
-                {submitAnswerAction.label}
-              </>
-            )}
-          </Button>
-        </form>
+        <AnswerInputForm
+          onSubmit={onSubmitAnswer}
+          isSubmitting={isSubmittingAnswer ?? false}
+          disabled={!submitAnswerAction.enabled}
+          buttonText={submitAnswerAction.label}
+        />
       )}
 
       {/* Show disabled reason if applicable */}

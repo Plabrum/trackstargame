@@ -10,13 +10,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Music, Send, CheckCircle2, XCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Music, CheckCircle2, XCircle } from "lucide-react";
 import { BuzzAnimation } from "@/components/game/BuzzAnimation";
 import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
 import { HostActionsPanel } from "./HostActionsPanel";
+import { Leaderboard } from "@/components/shared/Leaderboard";
+import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
 import type { Tables } from "@/lib/types/database";
 import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
 
@@ -107,9 +108,6 @@ export function HostGameView({
 
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
-
-  // Answer input state (solo mode)
-  const [answer, setAnswer] = useState('');
 
   // Answer judgment overrides (for text input mode)
   const [judgmentOverrides, setJudgmentOverrides] = useState<Record<string, boolean>>({});
@@ -288,42 +286,12 @@ export function HostGameView({
                session.allow_single_user &&
                session.enable_text_input_mode &&
                !hasSubmittedAnswer &&
-               !answerFeedback && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (answer.trim() && onSubmitAnswer) {
-                      onSubmitAnswer(answer.trim());
-                      setAnswer('');
-                    }
-                  }}
-                  className="space-y-3"
-                >
-                  <Input
-                    type="text"
-                    placeholder="Enter artist/band name..."
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    disabled={isSubmittingAnswer}
-                    className="text-lg h-14"
-                    autoFocus
-                  />
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="w-full h-14 text-xl font-bold"
-                    disabled={!answer.trim() || isSubmittingAnswer}
-                  >
-                    {isSubmittingAnswer ? (
-                      "SUBMITTING..."
-                    ) : (
-                      <>
-                        <Send className="h-6 w-6 mr-2" />
-                        SUBMIT ANSWER
-                      </>
-                    )}
-                  </Button>
-                </form>
+               !answerFeedback &&
+               onSubmitAnswer && (
+                <AnswerInputForm
+                  onSubmit={onSubmitAnswer}
+                  isSubmitting={isSubmittingAnswer ?? false}
+                />
               )}
 
               {/* Answer Review (Text Input Mode) */}
@@ -447,35 +415,11 @@ export function HostGameView({
 
         {/* Leaderboard */}
         <div>
-          <Card className="sticky top-6">
-            <CardHeader>
-              <CardTitle>Leaderboard</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {sortedPlayers.map((player, index) => (
-                  <div
-                    key={player.id}
-                    className={`flex items-center justify-between p-3 rounded-lg ${
-                      index === 0
-                        ? 'bg-yellow-100 border border-yellow-300'
-                        : 'bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl font-bold text-muted-foreground">
-                        {index + 1}
-                      </span>
-                      <span className="font-semibold">{player.name}</span>
-                    </div>
-                    <Badge variant={index === 0 ? "default" : "secondary"} className="text-lg px-3">
-                      {player.score ?? 0}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <Leaderboard
+            players={players}
+            variant="host"
+            className="sticky top-6"
+          />
         </div>
       </div>
     </div>

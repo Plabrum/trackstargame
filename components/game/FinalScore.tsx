@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Trophy, Medal, Award } from "lucide-react";
+import { Leaderboard } from "@/components/shared/Leaderboard";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -88,63 +89,12 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
       )}
 
       {/* Full Leaderboard */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Final Leaderboard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {sortedPlayers.map((player, index) => {
-              const isCurrentPlayer = currentPlayerId && player.id === currentPlayerId;
-              return (
-                <div
-                  key={player.id}
-                  className={`flex items-center justify-between p-4 rounded-lg ${
-                    isCurrentPlayer
-                      ? 'bg-purple-100 border-2 border-purple-300'
-                      : index === 0
-                      ? 'bg-gradient-to-r from-yellow-100 to-yellow-50'
-                      : index === 1
-                      ? 'bg-slate-100'
-                      : index === 2
-                      ? 'bg-orange-50'
-                      : 'bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-lg ${
-                        isCurrentPlayer
-                          ? 'bg-purple-500 text-white'
-                          : index === 0
-                          ? 'bg-yellow-400 text-yellow-900'
-                          : index === 1
-                          ? 'bg-slate-300 text-slate-700'
-                          : index === 2
-                          ? 'bg-orange-400 text-orange-900'
-                          : 'bg-slate-200 text-slate-600'
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <div>
-                      <span className={`text-lg ${index < 3 ? 'font-bold' : 'font-medium'}`}>
-                        {player.name}
-                      </span>
-                      {isCurrentPlayer && (
-                        <span className="ml-2 text-sm text-purple-600 font-semibold">(You)</span>
-                      )}
-                    </div>
-                  </div>
-                  <span className={`text-2xl font-bold ${isCurrentPlayer ? 'text-purple-600' : ''}`}>
-                    {player.score ?? 0}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <Leaderboard
+        players={players}
+        currentPlayerId={currentPlayerId ?? undefined}
+        variant="final"
+        title="Final Leaderboard"
+      />
 
       {/* Game Stats */}
       <Card>

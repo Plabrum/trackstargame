@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Music } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/types/database";
 
 type Pack = Tables<'packs'>;
@@ -31,18 +32,21 @@ interface PackSongsSheetProps {
 }
 
 export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps) {
-  // Fetch tracks for this pack
+  // Fetch tracks for this pack using direct Supabase query
   const { data: tracks, isLoading } = useQuery({
     queryKey: ['pack_tracks', pack?.id],
     queryFn: async () => {
       if (!pack?.id) return [];
 
-      const response = await fetch(`/api/packs/${pack.id}/tracks`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch tracks');
-      }
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('tracks')
+        .select('*')
+        .eq('pack_id', pack.id)
+        .order('title');
 
-      return response.json() as Promise<Track[]>;
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!pack?.id && open,
   });

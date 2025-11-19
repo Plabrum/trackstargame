@@ -68,27 +68,20 @@ export function HostGameController(props: HostGameControllerProps) {
 
   // Auto-play track when round starts
   useEffect(() => {
-    console.log('[HostGameController] Auto-play effect:', {
-      state: props.session.state,
-      hasSpotifyId: !!currentSpotifyId,
-      isReady,
-      hasStarted: hasStartedPlayingRef.current
-    });
-
     if (
       props.session.state === 'playing' &&
       currentSpotifyId &&
       isReady &&
       !hasStartedPlayingRef.current
     ) {
-      console.log('[HostGameController] Auto-playing track:', currentSpotifyId);
       play(currentSpotifyId)
         .then(() => {
-          console.log('[HostGameController] Successfully started playback');
           hasStartedPlayingRef.current = true;
         })
         .catch((err) => {
-          console.error('[HostGameController] Failed to auto-play:', err);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[HostGameController] Failed to auto-play:', err);
+          }
         });
     }
   }, [props.session.state, currentSpotifyId, isReady, play]);
@@ -96,9 +89,10 @@ export function HostGameController(props: HostGameControllerProps) {
   // Auto-pause when someone buzzes
   useEffect(() => {
     if (props.session.state === 'buzzed' && isPlaying) {
-      console.log('Auto-pausing due to buzz');
       pause().catch((err) => {
-        console.error('Failed to pause:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to pause:', err);
+        }
       });
     }
   }, [props.session.state, isPlaying, pause]);

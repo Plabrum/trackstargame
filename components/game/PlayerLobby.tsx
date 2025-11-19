@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { PlayerList } from "@/components/shared/PlayerList";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -132,51 +133,10 @@ export function PlayerLobby({
       )}
 
       {/* Players List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Players in Lobby
-            </span>
-            <Badge variant="secondary">{players.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {players.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <p>No players yet</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {players.map((player, index) => (
-                <div
-                  key={player.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg ${
-                    player.id === currentPlayerId
-                      ? 'bg-green-50 border border-green-200'
-                      : 'bg-slate-50'
-                  }`}
-                >
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full font-semibold ${
-                      player.id === currentPlayerId
-                        ? 'bg-green-500 text-white'
-                        : 'bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {index + 1}
-                  </div>
-                  <span className="font-medium flex-1">{player.name}</span>
-                  {player.id === currentPlayerId && (
-                    <Badge variant="outline" className="bg-white">You</Badge>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <PlayerList
+        players={players}
+        currentPlayerId={currentPlayerId ?? undefined}
+      />
 
       {hasJoined && (
         <Card className="bg-blue-50 border-blue-200">

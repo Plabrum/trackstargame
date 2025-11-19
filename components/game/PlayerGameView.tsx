@@ -8,13 +8,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music } from "lucide-react";
 import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
 import { PlayerActionsPanel } from "./PlayerActionsPanel";
+import { Leaderboard } from "@/components/shared/Leaderboard";
 import type { Tables } from "@/lib/types/database";
 
 type RoundJudgment = {
@@ -298,59 +299,12 @@ export function PlayerGameView({
       </Card>
 
       {/* Leaderboard */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Leaderboard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {sortedPlayers.map((player, index) => {
-              const isCurrentPlayer = player.id === currentPlayerId;
-              return (
-                <div
-                  key={player.id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    isCurrentPlayer
-                      ? 'bg-purple-100 border-2 border-purple-300'
-                      : index === 0
-                      ? 'bg-gradient-to-r from-yellow-100 to-yellow-50'
-                      : 'bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full font-semibold ${
-                        isCurrentPlayer
-                          ? 'bg-purple-500 text-white'
-                          : index === 0
-                          ? 'bg-yellow-400 text-yellow-900'
-                          : index === 1
-                          ? 'bg-slate-300 text-slate-700'
-                          : index === 2
-                          ? 'bg-orange-300 text-orange-900'
-                          : 'bg-slate-200 text-slate-600'
-                      }`}
-                    >
-                      {index + 1}
-                    </div>
-                    <div>
-                      <span className={`font-medium ${isCurrentPlayer ? 'font-bold' : ''}`}>
-                        {player.name}
-                        {isCurrentPlayer && (
-                          <span className="ml-2 text-sm text-purple-600">(You)</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <span className={`font-bold ${isCurrentPlayer ? 'text-purple-600' : ''}`}>
-                    <AnimatedScore score={player.score ?? 0} />
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <Leaderboard
+        players={players}
+        currentPlayerId={currentPlayerId}
+        variant="live"
+        animateScores={true}
+      />
     </div>
   );
 }
