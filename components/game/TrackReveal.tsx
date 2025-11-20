@@ -36,10 +36,10 @@ export function TrackReveal({
   return (
     <Alert className={`border-2 ${borderColor}`}>
       <AlertDescription>
-        <div className="flex items-center gap-6 py-4">
+        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 py-4">
           {/* Album Art */}
           {albumArt && (
-            <div className="relative w-32 h-32 rounded-lg overflow-hidden shadow-lg flex-shrink-0">
+            <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden shadow-lg flex-shrink-0">
               <Image
                 src={albumArt}
                 alt={`${trackTitle} album art`}
@@ -51,22 +51,22 @@ export function TrackReveal({
           )}
 
           {/* Track Information */}
-          <div className="flex-1 space-y-2">
-            <div className="flex items-start gap-2">
+          <div className="flex-1 space-y-2 text-center md:text-left w-full">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-2">
               {answerFeedback && (
                 answerFeedback.isCorrect ? (
-                  <CheckCircle2 className="h-7 w-7 text-green-600 flex-shrink-0 mt-1" />
+                  <CheckCircle2 className="h-6 w-6 md:h-7 md:w-7 text-green-600 flex-shrink-0 md:mt-1" />
                 ) : (
-                  <XCircle className="h-7 w-7 text-red-600 flex-shrink-0 mt-1" />
+                  <XCircle className="h-6 w-6 md:h-7 md:w-7 text-red-600 flex-shrink-0 md:mt-1" />
                 )
               )}
               <div className="flex-1">
-                <p className="text-2xl font-bold text-gray-950">{artistName}</p>
-                <p className="text-lg text-gray-700">{trackTitle}</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-950">{artistName}</p>
+                <p className="text-base md:text-lg text-gray-700">{trackTitle}</p>
               </div>
             </div>
             {answerFeedback && (
-              <p className={`text-xl font-semibold ${pointsColor}`}>
+              <p className={`text-lg md:text-xl font-semibold ${pointsColor}`}>
                 {answerFeedback.pointsEarned > 0 ? "+" : ""}
                 {answerFeedback.pointsEarned} points
               </p>

@@ -36,7 +36,6 @@ export function PackCard({
         <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
             <CardTitle className="text-xl flex items-center gap-2">
-              <Music className="h-5 w-5 text-orange" />
               {pack.name}
             </CardTitle>
             {pack.description && (

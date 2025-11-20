@@ -102,17 +102,31 @@ export function ActionButtonGroup({
 
   const gridClass = layout === 'grid' ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-3';
 
+  // Determine if a button should span 2 columns
+  const shouldSpanTwo = (index: number, total: number) => {
+    if (layout !== 'grid') return false;
+    // If only 1 button, it should span 2 columns
+    if (total === 1) return true;
+    // If 3 buttons, the third button (index 2) should span 2 columns
+    if (total === 3 && index === 2) return true;
+    return false;
+  };
+
   return (
     <div className={`${gridClass} ${className || ''}`}>
       {actions.map((actionDesc, index) => (
-        <ActionButton
+        <div
           key={`${actionDesc.action.type}-${index}`}
-          actionDescriptor={actionDesc}
-          onClick={onAction}
-          isLoading={loadingAction === actionDesc.action.type}
-          size={size}
-          showDisabledReason={showDisabledReasons}
-        />
+          className={shouldSpanTwo(index, actions.length) ? 'col-span-2' : ''}
+        >
+          <ActionButton
+            actionDescriptor={actionDesc}
+            onClick={onAction}
+            isLoading={loadingAction === actionDesc.action.type}
+            size={size}
+            showDisabledReason={showDisabledReasons}
+          />
+        </div>
       ))}
     </div>
   );

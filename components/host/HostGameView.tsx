@@ -194,9 +194,9 @@ export function HostGameView({
               answerFeedback={
                 answerFeedback
                   ? {
-                      isCorrect: answerFeedback.isCorrect,
-                      pointsEarned: answerFeedback.pointsEarned,
-                    }
+                    isCorrect: answerFeedback.isCorrect,
+                    pointsEarned: answerFeedback.pointsEarned,
+                  }
                   : undefined
               }
             />
@@ -230,7 +230,16 @@ export function HostGameView({
         {/* Header */}
         <Header
           title={`Round ${currentRoundNum} / ${totalRounds}`}
-          rightContent={<UserInfo />}
+          rightContent={
+            <>
+              <UserInfo />
+              <Badge variant="secondary" className="text-md px-3 py-2">
+                {isSoloMode ? 'Solo Mode' : 'Party Mode'}
+                {session.enable_text_input_mode && ' + Text Input'}
+                {hostPlayerId && ' | Host Player'}
+              </Badge>
+            </>
+          }
         />
 
 
@@ -243,11 +252,6 @@ export function HostGameView({
                 <CardTitle className="flex items-center gap-2 justify-between">
                   <Badge variant="outline" className="text-md px-3 py-2">
                     {getStateLabel()}
-                  </Badge>
-                  <Badge variant="secondary" className="text-md px-3 py-2">
-                    {isSoloMode ? 'Solo Mode' : 'Party Mode'}
-                    {session.enable_text_input_mode && ' + Text Input'}
-                    {hostPlayerId && ' | Host Player'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
