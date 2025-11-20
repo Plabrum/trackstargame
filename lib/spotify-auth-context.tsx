@@ -7,7 +7,6 @@
 'use client';
 
 import { createContext, useContext, useCallback } from 'react';
-import { clearSpotifyAuth } from './spotify-auth-actions';
 import { toast } from 'sonner';
 
 export interface SpotifyUser {
@@ -71,8 +70,14 @@ export function SpotifyAuthProvider({
    */
   const logout = useCallback(async () => {
     try {
-      // Clear server-side cookies
-      await clearSpotifyAuth();
+      // Clear server-side cookies via API route
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Logout request failed');
+      }
     } catch (error) {
       console.error('[SpotifyAuth] Logout failed:', error);
 
