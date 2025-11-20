@@ -31,7 +31,7 @@ export function SoloFinalScore({ player, rounds, onPlayAgain, albumArtUrl }: Sol
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <Header title="Game Over!" rightContent={<UserInfo />} />
+      <Header title="Game Over" rightContent={<UserInfo />} />
 
       {/* Regular Stats Display */}
       <SoloGameStats rounds={rounds} finalScore={player.score ?? 0} />

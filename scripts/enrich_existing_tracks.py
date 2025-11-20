@@ -54,9 +54,37 @@ def enrich_pack_tracks(pack_id: str, pack_name: str, spotify_client: SpotifyClie
     print(f"Processing pack: {pack_name}")
     print(f"{'='*80}")
 
-    tracks = get_pack_tracks(pack_id)
+    # Only get tracks that need enrichment (no release_year yet)
+    from utils.db import get_db_connection
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, title, artist, spotify_id, release_year, album_name, primary_genre, created_at
+            FROM tracks
+            WHERE pack_id = %s AND release_year IS NULL
+            ORDER BY created_at
+            """,
+            (pack_id,)
+        )
+
+        tracks = []
+        for row in cursor.fetchall():
+            tracks.append({
+                'id': row[0],
+                'title': row[1],
+                'artist': row[2],
+                'spotify_id': row[3],
+                'release_year': row[4],
+                'album_name': row[5],
+                'primary_genre': row[6],
+                'created_at': row[7]
+            })
+        cursor.close()
+
     total = len(tracks)
-    print(f"Found {total} tracks to enrich\n")
+    print(f"Found {total} tracks to enrich (skipping already enriched tracks)\n")
 
     stats = {
         'total': total,
@@ -71,12 +99,6 @@ def enrich_pack_tracks(pack_id: str, pack_name: str, spotify_client: SpotifyClie
         spotify_id = track['spotify_id']
         title = track['title']
         artist = track['artist']
-
-        # Skip if already enriched
-        if track.get('release_year') and track.get('primary_genre'):
-            print(f"[{i}/{total}] ✓ {title} - {artist} (already enriched)")
-            stats['success'] += 1
-            continue
 
         print(f"[{i}/{total}] Fetching metadata for: {title} - {artist}")
 
@@ -117,11 +139,11 @@ def enrich_pack_tracks(pack_id: str, pack_name: str, spotify_client: SpotifyClie
             year_str = str(release_year) if release_year else "Unknown"
             print(f"  ✓ Updated: {year_str} | {genre_str} | {album_name}")
 
-            # Rate limiting: Spotify allows ~100 requests per 30 seconds
-            # We're making 1-2 requests per track (track + artist)
-            # Sleep 0.5s between tracks to stay safe
+            # Rate limiting: Spotify allows ~180 requests per minute
+            # We're making 2 requests per track (track + artist)
+            # Sleep 1s between tracks to stay well under the limit
             if i < total:
-                time.sleep(0.5)
+                time.sleep(1.0)
 
         except Exception as e:
             print(f"  ✗ Error: {e}")

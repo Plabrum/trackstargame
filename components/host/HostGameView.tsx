@@ -144,12 +144,12 @@ export function HostGameView({
   const renderStateInfo = () => {
     switch (state) {
       case 'playing':
-        if (isSoloMode && session.enable_text_input_mode && hasSubmittedAnswer) {
+        if ((isSoloMode || (session.allow_host_to_play && hostPlayerId)) && session.enable_text_input_mode && hasSubmittedAnswer) {
           return (
             <Alert>
               <AlertDescription className="text-center py-4">
                 <p className="text-xl font-bold">Answer submitted!</p>
-                <p className="text-sm text-muted-foreground mt-2">Processing your answer...</p>
+                <p className="text-sm text-muted-foreground mt-2">{isSoloMode ? 'Processing your answer...' : 'Waiting for other players...'}</p>
               </AlertDescription>
             </Alert>
           );
@@ -259,9 +259,9 @@ export function HostGameView({
                 {/* State Information Display */}
                 {renderStateInfo()}
 
-                {/* Solo Mode Text Input */}
+                {/* Host Text Input (Solo or Party Mode) */}
                 {state === 'playing' &&
-                  isSoloMode &&
+                  (isSoloMode || (session.allow_host_to_play && hostPlayerId)) &&
                   session.enable_text_input_mode &&
                   !hasSubmittedAnswer &&
                   !answerFeedback &&

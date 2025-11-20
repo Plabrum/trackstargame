@@ -36,7 +36,7 @@ export function MultiplayerFinalScore({ players, rounds, onPlayAgain, currentPla
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <Header title="Game Over!" rightContent={showUserInfo ? <UserInfo /> : undefined} />
+      <Header title="Game Over" rightContent={showUserInfo ? <UserInfo /> : undefined} />
 
       {/* Winner Podium */}
       <Card className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-orange-50">
