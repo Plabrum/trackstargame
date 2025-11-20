@@ -20,6 +20,7 @@ import { HostActionsPanel } from "./HostActionsPanel";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
 import { Header } from "@/components/shared/Header";
+import { TrackReveal } from "@/components/game/TrackReveal";
 import type { Tables } from "@/lib/types/database";
 import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
 
@@ -108,6 +109,10 @@ export function HostGameView({
   // Sort players by score
   const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
+  // Solo mode detection and host player
+  const isSoloMode = players.length === 1 && players[0]?.is_host === true;
+  const hostPlayer = players.find(p => p.is_host);
+
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
 
@@ -138,7 +143,7 @@ export function HostGameView({
   const renderStateInfo = () => {
     switch (state) {
       case 'playing':
-        if (players.length === 1 && session.enable_text_input_mode && hasSubmittedAnswer) {
+        if (isSoloMode && session.enable_text_input_mode && hasSubmittedAnswer) {
           return (
             <Alert>
               <AlertDescription className="text-center py-4">
@@ -148,20 +153,7 @@ export function HostGameView({
             </Alert>
           );
         }
-        return (
-          <Alert>
-            <AlertDescription className="text-center py-4">
-              <p className="text-lg font-semibold">Music is playing...</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {session.enable_text_input_mode
-                  ? players.length === 1
-                    ? "Type the artist/band name when you know it!"
-                    : "Waiting for players to submit answers"
-                  : "Waiting for a player to buzz in"}
-              </p>
-            </AlertDescription>
-          </Alert>
-        );
+        return null;
 
       case 'buzzed':
         return (
@@ -192,38 +184,21 @@ export function HostGameView({
         );
 
       case 'reveal':
-        if (players.length === 1 && session.enable_text_input_mode && answerFeedback) {
-          return (
-            <Alert className={`border-2 ${
-              answerFeedback.isCorrect
-                ? 'border-green-500 bg-green-50'
-                : 'border-red-500 bg-red-50'
-            }`}>
-              <AlertDescription>
-                <div className="text-center py-6">
-                  <p className={`text-4xl font-bold mb-2 ${
-                    answerFeedback.isCorrect ? 'text-green-900' : 'text-red-900'
-                  }`}>
-                    {answerFeedback.isCorrect ? '✓ CORRECT!' : '✗ INCORRECT'}
-                  </p>
-                  <p className={`text-2xl font-semibold ${
-                    answerFeedback.isCorrect ? 'text-green-700' : 'text-red-700'
-                  }`}>
-                    {answerFeedback.pointsEarned > 0 ? '+' : ''}{answerFeedback.pointsEarned} points
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          );
-        }
-
         if (currentTrack) {
           return (
-            <div className="text-center p-6 bg-orange/10 rounded-lg border border-orange/20">
-              <p className="text-sm text-muted-foreground mb-2">Track Revealed</p>
-              <p className="text-2xl font-bold">{currentTrack.title}</p>
-              <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
-            </div>
+            <TrackReveal
+              trackTitle={currentTrack.title}
+              artistName={currentTrack.artist}
+              albumArt={playbackState?.track?.albumArt}
+              answerFeedback={
+                answerFeedback
+                  ? {
+                      isCorrect: answerFeedback.isCorrect,
+                      pointsEarned: answerFeedback.pointsEarned,
+                    }
+                  : undefined
+              }
+            />
           );
         }
 
@@ -251,184 +226,175 @@ export function HostGameView({
           isCorrect={null}
         />
 
-      {/* Header */}
-      <Header title={`Round ${currentRoundNum} / ${totalRounds}`} showUserInfo />
+        {/* Header */}
+        <Header title={`Round ${currentRoundNum} / ${totalRounds}`} showUserInfo />
 
-      {/* Game Status */}
-      <div className="flex items-center justify-center gap-3">
-        <Badge variant="secondary" className="text-sm px-3 py-1">
-          {players.length === 1 ? 'Solo Mode' : 'Party Mode'}
-          {session.enable_text_input_mode && ' + Text Input'}
-          {hostPlayerId && ' | Host Player: ✓'}
-        </Badge>
-        <Badge variant="outline" className="text-lg px-4 py-2">
-          {getStateLabel()}
-        </Badge>
-      </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Main Control Panel */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Round Control */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Music className="h-5 w-5" />
-                Round Control
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* State Information Display */}
-              {renderStateInfo()}
-
-              {/* Solo Mode Text Input */}
-              {state === 'playing' &&
-               players.length === 1 &&
-               session.enable_text_input_mode &&
-               !hasSubmittedAnswer &&
-               !answerFeedback &&
-               onSubmitAnswer && (
-                <AnswerInputForm
-                  onSubmit={onSubmitAnswer}
-                  isSubmitting={isSubmittingAnswer ?? false}
-                />
-              )}
-
-              {/* Answer Review (Text Input Mode) */}
-              {state === 'submitted' && submittedAnswers && submittedAnswers.length > 0 && (
-                <div className="space-y-2">
-                  {submittedAnswers.map((answer) => {
-                    const player = players.find(p => p.id === answer.player_id);
-                    const finalJudgment = judgmentOverrides[answer.player_id] ?? answer.auto_validated;
-
-                    return (
-                      <Card key={answer.id} className={`${
-                        finalJudgment
-                          ? 'border-green-300 bg-green-50'
-                          : 'border-red-300 bg-red-50'
-                      }`}>
-                        <CardContent className="pt-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <p className="font-bold">{player?.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Answer: <span className="font-medium text-foreground">{answer.submitted_answer}</span>
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Auto-validated: {answer.auto_validated ? '✓ Correct' : '✗ Incorrect'}
-                                {(answer.points_awarded ?? 0) > 0 && ` (+${answer.points_awarded} pts)`}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant={finalJudgment ? "default" : "outline"}
-                                className={finalJudgment ? "bg-green-600 hover:bg-green-700" : ""}
-                                onClick={() => setJudgmentOverrides(prev => ({
-                                  ...prev,
-                                  [answer.player_id]: true
-                                }))}
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={!finalJudgment ? "destructive" : "outline"}
-                                onClick={() => setJudgmentOverrides(prev => ({
-                                  ...prev,
-                                  [answer.player_id]: false
-                                }))}
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ACTION-BASED CONTROLS */}
-              <HostActionsPanel
-                session={session}
-                players={players}
-                currentRound={currentRound}
-                submittedAnswers={submittedAnswers}
-                onStartGame={() => {}}
-                onJudgeAnswer={(correct) => {
-                  correct ? onJudgeCorrect() : onJudgeIncorrect();
-                }}
-                onAdvanceRound={onNextRound}
-                onRevealAnswer={() => onRevealTrack?.()}
-                onEndGame={() => onEndGame?.()}
-                onUpdateSettings={() => {}}
-                onFinalizeJudgments={(overrides) => onFinalizeJudgment?.(overrides ?? judgmentOverrides)}
-                isJudging={isJudging}
-                isAdvancing={isAdvancing}
-                isRevealing={isRevealing}
-                isEndingGame={isEndingGame}
-                isFinalizing={isFinalizing}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Round Summary (when revealed) */}
-          {state === 'reveal' && buzzerPlayer && (
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* Main Control Panel */}
+          <div className="md:col-span-2 space-y-6">
+            {/* Round Control */}
             <Card>
               <CardHeader>
-                <CardTitle>Round Summary</CardTitle>
+                <CardTitle className="flex items-center gap-2 justify-between">
+                  <Badge variant="outline" className="text-md px-3 py-2">
+                    {getStateLabel()}
+                  </Badge>
+                  <Badge variant="secondary" className="text-md px-3 py-2">
+                    {isSoloMode ? 'Solo Mode' : 'Party Mode'}
+                    {session.enable_text_input_mode && ' + Text Input'}
+                    {hostPlayerId && ' | Host Player'}
+                  </Badge>
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
-                    <span className="text-muted-foreground">First Buzz</span>
-                    <span className="font-semibold">{buzzerPlayer.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
-                    <span className="text-muted-foreground">Time</span>
-                    <span className="font-semibold">{elapsedSeconds?.toFixed(2)}s</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
-                    <span className="text-muted-foreground">Points</span>
-                    <span className="font-semibold">
-                      {Math.max(1, Math.round((30 - (elapsedSeconds || 0)) * 10) / 10)}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              <CardContent className="space-y-4">
+                {/* State Information Display */}
+                {renderStateInfo()}
 
-        {/* Score Display - conditional based on player count */}
-        <div>
-          {players.length === 1 ? (
-            <Card className="sticky top-6">
-              <CardHeader>
-                <CardTitle>Current Score</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-6">
-                  <div className="text-6xl font-bold text-orange">
-                    <AnimatedScore score={players[0]?.score ?? 0} />
+                {/* Solo Mode Text Input */}
+                {state === 'playing' &&
+                  isSoloMode &&
+                  session.enable_text_input_mode &&
+                  !hasSubmittedAnswer &&
+                  !answerFeedback &&
+                  onSubmitAnswer && (
+                    <AnswerInputForm
+                      onSubmit={onSubmitAnswer}
+                      isSubmitting={isSubmittingAnswer ?? false}
+                    />
+                  )}
+
+                {/* Answer Review (Text Input Mode) */}
+                {state === 'submitted' && submittedAnswers && submittedAnswers.length > 0 && (
+                  <div className="space-y-2">
+                    {submittedAnswers.map((answer) => {
+                      const player = players.find(p => p.id === answer.player_id);
+                      const finalJudgment = judgmentOverrides[answer.player_id] ?? answer.auto_validated;
+
+                      return (
+                        <Card key={answer.id} className={`${finalJudgment
+                          ? 'border-green-300 bg-green-50'
+                          : 'border-red-300 bg-red-50'
+                          }`}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="font-bold">{player?.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Answer: <span className="font-medium text-foreground">{answer.submitted_answer}</span>
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Auto-validated: {answer.auto_validated ? '✓ Correct' : '✗ Incorrect'}
+                                  {(answer.points_awarded ?? 0) > 0 && ` (+${answer.points_awarded} pts)`}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={finalJudgment ? "default" : "outline"}
+                                  className={finalJudgment ? "bg-green-600 hover:bg-green-700" : ""}
+                                  onClick={() => setJudgmentOverrides(prev => ({
+                                    ...prev,
+                                    [answer.player_id]: true
+                                  }))}
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={!finalJudgment ? "destructive" : "outline"}
+                                  onClick={() => setJudgmentOverrides(prev => ({
+                                    ...prev,
+                                    [answer.player_id]: false
+                                  }))}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Keep going! 🎵
-                  </p>
-                </div>
+                )}
+
+                {/* ACTION-BASED CONTROLS */}
+                <HostActionsPanel
+                  session={session}
+                  players={players}
+                  currentRound={currentRound}
+                  submittedAnswers={submittedAnswers}
+                  onStartGame={() => { }}
+                  onJudgeAnswer={(correct) => {
+                    correct ? onJudgeCorrect() : onJudgeIncorrect();
+                  }}
+                  onAdvanceRound={onNextRound}
+                  onRevealAnswer={() => onRevealTrack?.()}
+                  onEndGame={() => onEndGame?.()}
+                  onUpdateSettings={() => { }}
+                  onFinalizeJudgments={(overrides) => onFinalizeJudgment?.(overrides ?? judgmentOverrides)}
+                  isJudging={isJudging}
+                  isAdvancing={isAdvancing}
+                  isRevealing={isRevealing}
+                  isEndingGame={isEndingGame}
+                  isFinalizing={isFinalizing}
+                />
               </CardContent>
             </Card>
-          ) : (
-            <Leaderboard
-              players={players}
-              variant="host"
-              className="sticky top-6"
-            />
-          )}
+
+            {/* Round Summary (when revealed) */}
+            {state === 'reveal' && buzzerPlayer && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Round Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
+                      <span className="text-muted-foreground">First Buzz</span>
+                      <span className="font-semibold">{buzzerPlayer.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
+                      <span className="text-muted-foreground">Time</span>
+                      <span className="font-semibold">{elapsedSeconds?.toFixed(2)}s</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
+                      <span className="text-muted-foreground">Points</span>
+                      <span className="font-semibold">
+                        {Math.max(1, Math.round((30 - (elapsedSeconds || 0)) * 10) / 10)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Score Display - conditional based on player count */}
+          <div>
+            {isSoloMode ? (
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle>Current Score</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-6">
+                    <div className="text-6xl font-bold text-orange">
+                      <AnimatedScore score={hostPlayer?.score ?? 0} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Leaderboard
+                players={players}
+                variant="host"
+                className="sticky top-6"
+              />
+            )}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Spotify Playback Controls - Sticky Bottom */}

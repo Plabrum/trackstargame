@@ -1,12 +1,18 @@
 "use client";
 
+import { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Trophy, Medal, Award } from "lucide-react";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { Header } from "@/components/shared/Header";
+import { SoloGameStats } from "./SoloGameStats";
+import { ShareButton } from "./ShareButton";
+import { ShareableScoreCard } from "./ShareableScoreCard";
 import type { Tables } from "@/lib/types/database";
+import { useSpotifyAuth } from "@/lib/spotify-auth-context";
+import { useTrack, useSpotifyAlbumArt } from "@/hooks/queries/use-game";
 
 type Player = Tables<'players'>;
 type GameRound = Tables<'game_rounds'>;
@@ -19,11 +25,81 @@ interface FinalScoreProps {
 }
 
 export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: FinalScoreProps) {
+  // Detect solo mode
+  const isSoloMode = players.length === 1 && players[0]?.is_host === true;
+  const soloPlayer = isSoloMode ? players[0] : null;
+
+  // Ref for shareable content (solo mode only)
+  const shareableRef = useRef<HTMLDivElement>(null);
+
+  // Get Spotify access token from context (always call hook)
+  const { accessToken } = useSpotifyAuth();
+
+  // Calculate stats for solo mode
+  const totalRounds = rounds.length;
+  const correctAnswers = rounds.filter(r => r.correct === true).length;
+  const accuracy = totalRounds > 0 ? Math.round((correctAnswers / totalRounds) * 100) : 0;
+
+  // Find best round for album art
+  const bestRound = rounds.reduce((best, current) => {
+    const currentPoints = current.points_awarded || 0;
+    const bestPoints = best?.points_awarded || 0;
+    return currentPoints > bestPoints ? current : best;
+  }, rounds[0]);
+
+  // Fetch track details for best round (solo mode only)
+  const { data: bestRoundTrack } = useTrack(isSoloMode ? bestRound?.track_id ?? null : null);
+
+  // Fetch album art from Spotify API (solo mode only)
+  const { data: albumArt } = useSpotifyAlbumArt(
+    bestRoundTrack?.spotify_id ?? null,
+    accessToken
+  );
+
   // Sort players by score
   const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const winner = sortedPlayers[0];
   const topThree = sortedPlayers.slice(0, 3);
 
+  // Solo Mode View
+  if (isSoloMode && soloPlayer) {
+    return (
+      <div className="container mx-auto p-6 max-w-4xl space-y-6">
+        {/* Header */}
+        <Header title="Game Over!" showUserInfo />
+
+        {/* Regular Stats Display */}
+        <SoloGameStats rounds={rounds} finalScore={soloPlayer.score ?? 0} />
+
+        <Separator />
+
+        {/* Actions */}
+        <div className="flex flex-col gap-4">
+          <ShareButton
+            targetRef={shareableRef}
+            title="My Trackstar Game Score"
+            text={`I scored ${soloPlayer.score ?? 0} points in Trackstar! 🎵`}
+          />
+          <Button size="lg" variant="outline" onClick={onPlayAgain} className="w-full">
+            Play Again
+          </Button>
+        </div>
+
+        {/* Hidden Shareable Card (for capture) */}
+        <div className="fixed -left-[9999px] top-0">
+          <ShareableScoreCard
+            ref={shareableRef}
+            finalScore={soloPlayer.score ?? 0}
+            rounds={rounds}
+            accuracy={accuracy}
+            albumArtUrl={albumArt}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Multiplayer Mode View
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}

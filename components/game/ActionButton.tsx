@@ -45,13 +45,13 @@ export function ActionButton({
   const { action, label, description, enabled, disabledReason, variant } = actionDescriptor;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 w-full">
       <Button
         variant={mapVariant(variant)}
         size={size}
         disabled={!enabled || isLoading}
         onClick={() => onClick(action)}
-        className={className}
+        className={`w-full ${className || ''}`}
         title={description} // Native browser tooltip for description
       >
         {isLoading ? 'Loading...' : label}
@@ -100,7 +100,7 @@ export function ActionButtonGroup({
     return null;
   }
 
-  const gridClass = layout === 'grid' ? `grid grid-cols-${columns} gap-3` : 'flex flex-col gap-3';
+  const gridClass = layout === 'grid' ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-3';
 
   return (
     <div className={`${gridClass} ${className || ''}`}>

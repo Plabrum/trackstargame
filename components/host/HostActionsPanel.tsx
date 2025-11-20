@@ -114,49 +114,21 @@ export function HostActionsPanel({
     }
   };
 
-  // Group actions by category for better UX
-  const primaryActions = actions.filter(a => a.variant === 'primary');
-  const secondaryActions = actions.filter(a => a.variant === 'secondary');
-  const dangerActions = actions.filter(a => a.variant === 'danger');
+  // Sort actions by priority: primary, then secondary, then danger
+  const sortedActions = [...actions].sort((a, b) => {
+    const order = { primary: 0, secondary: 1, danger: 2 };
+    return (order[a.variant || 'secondary'] || 1) - (order[b.variant || 'secondary'] || 1);
+  });
 
   return (
-    <div className="space-y-4">
-      {/* Primary Actions */}
-      {primaryActions.length > 0 && (
-        <ActionButtonGroup
-          actions={primaryActions}
-          onAction={handleAction}
-          loadingAction={getLoadingAction()}
-          layout="grid"
-          columns={2}
-          size="lg"
-          showDisabledReasons={true}
-        />
-      )}
-
-      {/* Secondary Actions */}
-      {secondaryActions.length > 0 && (
-        <ActionButtonGroup
-          actions={secondaryActions}
-          onAction={handleAction}
-          loadingAction={getLoadingAction()}
-          layout="flex"
-          size="default"
-          showDisabledReasons={false}
-        />
-      )}
-
-      {/* Danger Actions */}
-      {dangerActions.length > 0 && (
-        <ActionButtonGroup
-          actions={dangerActions}
-          onAction={handleAction}
-          loadingAction={getLoadingAction()}
-          layout="flex"
-          size="default"
-          showDisabledReasons={false}
-        />
-      )}
-    </div>
+    <ActionButtonGroup
+      actions={sortedActions}
+      onAction={handleAction}
+      loadingAction={getLoadingAction()}
+      layout="grid"
+      columns={2}
+      size="lg"
+      showDisabledReasons={true}
+    />
   );
 }

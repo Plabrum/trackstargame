@@ -12,6 +12,7 @@ import type { TableRow } from '@/lib/types/database-helpers';
 type GameSession = TableRow<'game_sessions'>;
 type Player = TableRow<'players'>;
 type GameRound = TableRow<'game_rounds'>;
+type Track = TableRow<'tracks'>;
 
 /**
  * Fetch a game session with real-time updates.
@@ -182,6 +183,79 @@ export function useGameRounds(sessionId: string | null) {
       channel.unsubscribe();
     };
   }, [sessionId, queryClient]);
+
+  return query;
+}
+
+/**
+ * Fetch track details by track ID.
+ *
+ * Uses direct Supabase query (no realtime needed for static track data)
+ */
+export function useTrack(trackId: string | null) {
+  const supabase = createClient();
+
+  const query = useQuery({
+    queryKey: ['tracks', trackId],
+    queryFn: async () => {
+      if (!trackId) return null;
+
+      const { data, error } = await supabase
+        .from('tracks')
+        .select('*')
+        .eq('id', trackId)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch track:', error);
+        return null;
+      }
+
+      return data as Track;
+    },
+    enabled: !!trackId,
+    staleTime: Infinity, // Track data doesn't change, cache indefinitely
+  });
+
+  return query;
+}
+
+/**
+ * Fetch album art from Spotify API using a track's Spotify ID.
+ *
+ * Requires Spotify access token.
+ */
+export function useSpotifyAlbumArt(spotifyId: string | null, accessToken: string | null) {
+  const query = useQuery({
+    queryKey: ['spotify-album-art', spotifyId],
+    queryFn: async () => {
+      if (!spotifyId || !accessToken) return null;
+
+      try {
+        const response = await fetch(
+          `https://api.spotify.com/v1/tracks/${spotifyId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          console.error('Failed to fetch Spotify track info');
+          return null;
+        }
+
+        const data = await response.json();
+        return data.album?.images?.[0]?.url || null;
+      } catch (error) {
+        console.error('Error fetching album art:', error);
+        return null;
+      }
+    },
+    enabled: !!spotifyId && !!accessToken,
+    staleTime: Infinity, // Album art URLs don't change, cache indefinitely
+  });
 
   return query;
 }
