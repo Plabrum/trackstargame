@@ -44,6 +44,20 @@ export function PackCard({
                 {pack.description}
               </CardDescription>
             )}
+            {pack.tags && pack.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {pack.tags.slice(0, 5).map((tag, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+                {pack.tags.length > 5 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{pack.tags.length - 5}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
           <Badge variant="secondary" className="ml-2">
             {trackCount} {trackCount === 1 ? 'track' : 'tracks'}

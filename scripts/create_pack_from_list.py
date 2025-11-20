@@ -3,14 +3,14 @@
 Create a pack from a text file with a list of songs.
 
 Usage:
-    python create_pack_from_list.py <file.txt> <pack_name>
+    python create_pack_from_list.py <file.txt> <pack_name> [tags...]
 
 File format (one song per line):
     Song Title - Artist Name
     Another Song - Another Artist
 
 Example:
-    python create_pack_from_list.py rolling_stone_top_100.txt "Rolling Stone Top 100"
+    python create_pack_from_list.py rolling_stone_top_100.txt "Rolling Stone Top 100" "Classic Rock" "70s" "80s"
 """
 import sys
 import os
@@ -61,9 +61,9 @@ def main():
     load_dotenv()
 
     if len(sys.argv) < 3:
-        print("Usage: python create_pack_from_list.py <file.txt> <pack_name>")
+        print("Usage: python create_pack_from_list.py <file.txt> <pack_name> [tags...]")
         print("\nExample:")
-        print('  python create_pack_from_list.py songs.txt "My Custom Pack"')
+        print('  python create_pack_from_list.py songs.txt "My Custom Pack" "Rock" "80s"')
         print("\nFile format (one song per line):")
         print("  Song Title - Artist Name")
         print("  Another Song - Another Artist")
@@ -71,6 +71,7 @@ def main():
 
     filepath = sys.argv[1]
     pack_name = sys.argv[2]
+    tags = sys.argv[3:] if len(sys.argv) > 3 else None
 
     if not os.path.exists(filepath):
         print(f"Error: File '{filepath}' not found")
@@ -128,7 +129,9 @@ def main():
     pack_description = f"Custom song pack created from {os.path.basename(filepath)}"
 
     print(f"Creating pack: {pack_name}")
-    pack_id = create_pack(pack_name, pack_description)
+    if tags:
+        print(f"Tags: {', '.join(tags)}")
+    pack_id = create_pack(pack_name, pack_description, tags)
 
     # Step 4: Add tracks
     added_count = add_tracks_to_pack(pack_id, spotify_tracks)

@@ -32,13 +32,14 @@ def get_db_connection():
         conn.close()
 
 
-def create_pack(name: str, description: Optional[str] = None) -> str:
+def create_pack(name: str, description: Optional[str] = None, tags: Optional[List[str]] = None) -> str:
     """
     Create a new pack in the database.
 
     Args:
         name: Pack name
         description: Optional pack description
+        tags: Optional list of tags for categorization (genre, decade, difficulty, etc.)
 
     Returns:
         The UUID of the created pack
@@ -48,17 +49,18 @@ def create_pack(name: str, description: Optional[str] = None) -> str:
 
         cursor.execute(
             """
-            INSERT INTO packs (name, description)
-            VALUES (%s, %s)
+            INSERT INTO packs (name, description, tags)
+            VALUES (%s, %s, %s)
             RETURNING id
             """,
-            (name, description)
+            (name, description, tags or [])
         )
 
         pack_id = cursor.fetchone()[0]
         cursor.close()
 
-        print(f"Created pack: {name} (ID: {pack_id})")
+        tags_str = f" with tags: {', '.join(tags)}" if tags else ""
+        print(f"Created pack: {name}{tags_str} (ID: {pack_id})")
         return pack_id
 
 
@@ -106,7 +108,7 @@ def get_all_packs() -> List[Dict]:
     Get all packs from the database.
 
     Returns:
-        List of pack dicts with 'id', 'name', 'description', 'track_count'
+        List of pack dicts with 'id', 'name', 'description', 'tags', 'track_count'
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -117,11 +119,12 @@ def get_all_packs() -> List[Dict]:
                 p.id,
                 p.name,
                 p.description,
+                p.tags,
                 p.created_at,
                 COUNT(t.id) as track_count
             FROM packs p
             LEFT JOIN tracks t ON t.pack_id = p.id
-            GROUP BY p.id, p.name, p.description, p.created_at
+            GROUP BY p.id, p.name, p.description, p.tags, p.created_at
             ORDER BY p.created_at DESC
             """
         )
@@ -132,8 +135,9 @@ def get_all_packs() -> List[Dict]:
                 'id': row[0],
                 'name': row[1],
                 'description': row[2],
-                'created_at': row[3],
-                'track_count': row[4]
+                'tags': row[3] or [],
+                'created_at': row[4],
+                'track_count': row[5]
             })
 
         cursor.close()

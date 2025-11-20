@@ -1,15 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Trophy, Medal, Award } from "lucide-react";
-import { Leaderboard } from "@/components/shared/Leaderboard";
-import { Header } from "@/components/shared/Header";
-import { SoloGameStats } from "./SoloGameStats";
-import { ShareButton } from "./ShareButton";
-import { ShareableScoreCard } from "./ShareableScoreCard";
+import { SoloFinalScore } from "./SoloFinalScore";
+import { MultiplayerFinalScore } from "./MultiplayerFinalScore";
 import type { Tables } from "@/lib/types/database";
 import { useSpotifyAuth } from "@/lib/spotify-auth-context";
 import { useTrack, useSpotifyAlbumArt } from "@/hooks/queries/use-game";
@@ -29,18 +21,10 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
   const isSoloMode = players.length === 1 && players[0]?.is_host === true;
   const soloPlayer = isSoloMode ? players[0] : null;
 
-  // Ref for shareable content (solo mode only)
-  const shareableRef = useRef<HTMLDivElement>(null);
-
   // Get Spotify access token from context (always call hook)
   const { accessToken } = useSpotifyAuth();
 
-  // Calculate stats for solo mode
-  const totalRounds = rounds.length;
-  const correctAnswers = rounds.filter(r => r.correct === true).length;
-  const accuracy = totalRounds > 0 ? Math.round((correctAnswers / totalRounds) * 100) : 0;
-
-  // Find best round for album art
+  // Find best round for album art (solo mode only)
   const bestRound = rounds.reduce((best, current) => {
     const currentPoints = current.points_awarded || 0;
     const bestPoints = best?.points_awarded || 0;
@@ -56,151 +40,25 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
     accessToken
   );
 
-  // Sort players by score
-  const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const winner = sortedPlayers[0];
-  const topThree = sortedPlayers.slice(0, 3);
-
   // Solo Mode View
   if (isSoloMode && soloPlayer) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl space-y-6">
-        {/* Header */}
-        <Header title="Game Over!" showUserInfo />
-
-        {/* Regular Stats Display */}
-        <SoloGameStats rounds={rounds} finalScore={soloPlayer.score ?? 0} />
-
-        <Separator />
-
-        {/* Actions */}
-        <div className="flex flex-col gap-4">
-          <ShareButton
-            targetRef={shareableRef}
-            title="My Trackstar Game Score"
-            text={`I scored ${soloPlayer.score ?? 0} points in Trackstar! 🎵`}
-          />
-          <Button size="lg" variant="outline" onClick={onPlayAgain} className="w-full">
-            Play Again
-          </Button>
-        </div>
-
-        {/* Hidden Shareable Card (for capture) */}
-        <div className="fixed -left-[9999px] top-0">
-          <ShareableScoreCard
-            ref={shareableRef}
-            finalScore={soloPlayer.score ?? 0}
-            rounds={rounds}
-            accuracy={accuracy}
-            albumArtUrl={albumArt}
-          />
-        </div>
-      </div>
+      <SoloFinalScore
+        player={soloPlayer}
+        rounds={rounds}
+        onPlayAgain={onPlayAgain}
+        albumArtUrl={albumArt}
+      />
     );
   }
 
   // Multiplayer Mode View
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
-      {/* Header */}
-      <Header title="Game Over!" showUserInfo />
-
-      {/* Winner Podium */}
-      <Card className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-orange-50">
-        <CardContent className="pt-6">
-          <div className="text-center space-y-4">
-            <Trophy className="h-20 w-20 mx-auto text-yellow-500" />
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Winner</p>
-              <p className="text-4xl font-bold">{winner?.name || 'No Winner'}</p>
-              <p className="text-2xl text-yellow-600 font-semibold mt-2">
-                {winner?.score ?? 0} points
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Top 3 */}
-      {topThree.length > 1 && (
-        <div className="grid md:grid-cols-3 gap-4">
-          {topThree.map((player, index) => {
-            const icons = [Trophy, Medal, Award];
-            const Icon = icons[index] || Award;
-            const colors = [
-              'text-yellow-500',
-              'text-slate-400',
-              'text-orange-500',
-            ];
-            const bgColors = [
-              'bg-yellow-900/20',
-              'bg-card',
-              'bg-orange/10',
-            ];
-
-            if (index === 0) return null; // Skip winner (already shown above)
-
-            return (
-              <Card key={player.id} className={bgColors[index]}>
-                <CardContent className="pt-6">
-                  <div className="text-center space-y-2">
-                    <Icon className={`h-12 w-12 mx-auto ${colors[index]}`} />
-                    <div>
-                      <p className="text-sm text-muted-foreground">#{index + 1}</p>
-                      <p className="text-xl font-bold">{player.name}</p>
-                      <p className="text-lg font-semibold text-muted-foreground">
-                        {player.score ?? 0} points
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Full Leaderboard */}
-      <Leaderboard
-        players={players}
-        currentPlayerId={currentPlayerId ?? undefined}
-        variant="final"
-        title="Final Leaderboard"
-      />
-
-      {/* Game Stats */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Game Statistics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-card border border-border rounded-lg">
-              <p className="text-3xl font-bold text-orange">{rounds.length}</p>
-              <p className="text-sm text-muted-foreground mt-1">Rounds Played</p>
-            </div>
-            <div className="text-center p-4 bg-card border border-border rounded-lg">
-              <p className="text-3xl font-bold text-orange">{players.length}</p>
-              <p className="text-sm text-muted-foreground mt-1">Players</p>
-            </div>
-            <div className="text-center p-4 bg-card border border-border rounded-lg">
-              <p className="text-3xl font-bold text-orange">
-                {sortedPlayers.length > 0 ? Math.max(...sortedPlayers.map(p => p.score ?? 0)) : 0}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">Highest Score</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      {/* Actions */}
-      <div className="flex justify-center gap-4">
-        <Button size="lg" onClick={onPlayAgain} className="min-w-[200px]">
-          Play Again
-        </Button>
-      </div>
-    </div>
+    <MultiplayerFinalScore
+      players={players}
+      rounds={rounds}
+      onPlayAgain={onPlayAgain}
+      currentPlayerId={currentPlayerId}
+    />
   );
 }
