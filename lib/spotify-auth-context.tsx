@@ -8,7 +8,7 @@
 
 import { createContext, useContext, useCallback } from 'react';
 import { clearSpotifyAuth } from './spotify-auth-actions';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface SpotifyUser {
   display_name: string;
@@ -77,10 +77,8 @@ export function SpotifyAuthProvider({
       console.error('[SpotifyAuth] Logout failed:', error);
 
       // Show error toast to user
-      toast({
-        title: 'Logout failed',
+      toast.error('Logout failed', {
         description: 'Failed to clear your session. Please try again.',
-        variant: 'destructive',
       });
 
       // Don't redirect if logout failed

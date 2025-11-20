@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Settings, User, Users, KeyboardIcon } from "lucide-react";
 import { useUpdateSettings } from "@/hooks/mutations/use-game-mutations";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Tables } from "@/lib/types/database";
 
 type GameSession = Tables<'game_sessions'>;
@@ -46,7 +46,6 @@ export function GameSettingsForm({
   onPartyHostPlaysChange,
 }: GameSettingsFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const updateSettings = useUpdateSettings();
 
   // Settings panel state
@@ -121,8 +120,7 @@ export function GameSettingsForm({
         totalRounds: parseInt(totalRoundsStr),
       });
 
-      toast({
-        title: "Settings saved!",
+      toast.success("Settings saved!", {
         description: embedded ? "Settings updated successfully" : "Redirecting to lobby...",
       });
 
@@ -133,10 +131,8 @@ export function GameSettingsForm({
         router.push(`/host/${session.id}`);
       }
     } catch (error) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: error instanceof Error ? error.message : "Failed to save settings",
-        variant: "destructive",
       });
     }
   };

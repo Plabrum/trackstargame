@@ -11,14 +11,13 @@ import { PlayerGameView } from "@/components/game/PlayerGameView";
 import { PlayerFinalScore } from "@/components/game/PlayerFinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { fuzzyMatch } from "@/lib/game/fuzzy-match";
 import { calculatePoints } from "@/lib/game/state-machine";
 
 export default function PlayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { toast } = useToast();
 
   // Player ID state (stored in localStorage)
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -94,10 +93,8 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
           localStorage.setItem(`player_${id}`, player.id);
         },
         onError: (error) => {
-          toast({
-            title: "Failed to join",
+          toast.error("Failed to join", {
             description: error.message,
-            variant: "destructive",
           });
         },
       }
@@ -110,10 +107,8 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     // Calculate elapsed time
     const roundStartTime = session.round_start_time;
     if (!roundStartTime) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Round has not started yet",
-        variant: "destructive",
       });
       return;
     }
@@ -145,10 +140,8 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
           });
         },
         onError: (error) => {
-          toast({
-            title: "Failed to submit answer",
+          toast.error("Failed to submit answer", {
             description: error.message,
-            variant: "destructive",
           });
         },
       }

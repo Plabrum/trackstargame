@@ -2,7 +2,7 @@
 Spotify API utilities for searching tracks and getting preview URLs.
 """
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 
@@ -15,10 +15,10 @@ class SpotifyClient:
         Initialize Spotify client.
 
         Args:
-            client_id: Spotify app client ID (defaults to env var SPOTIFY_CLIENT_ID)
+            client_id: Spotify app client ID (defaults to env var SPOTIFY_CLIENT_ID or NEXT_PUBLIC_SPOTIFY_CLIENT_ID)
             client_secret: Spotify app client secret (defaults to env var SPOTIFY_CLIENT_SECRET)
         """
-        self.client_id = client_id or os.getenv('SPOTIFY_CLIENT_ID')
+        self.client_id = client_id or os.getenv('SPOTIFY_CLIENT_ID') or os.getenv('NEXT_PUBLIC_SPOTIFY_CLIENT_ID')
         self.client_secret = client_secret or os.getenv('SPOTIFY_CLIENT_SECRET')
 
         if not self.client_id or not self.client_secret:
@@ -32,6 +32,60 @@ class SpotifyClient:
             client_secret=self.client_secret
         )
         self.sp = spotipy.Spotify(auth_manager=auth_manager)
+
+    def get_artist_genres(self, artist_id: str) -> List[str]:
+        """
+        Get genres for a specific artist.
+
+        Args:
+            artist_id: Spotify artist ID
+
+        Returns:
+            List of genre strings (may be empty)
+        """
+        try:
+            artist = self.sp.artist(artist_id)
+            return artist.get('genres', [])
+        except Exception as e:
+            print(f"Error fetching artist {artist_id}: {e}")
+            return []
+
+    def _extract_year(self, release_date: str) -> Optional[int]:
+        """
+        Extract year from Spotify release_date string.
+
+        Args:
+            release_date: Release date in format 'YYYY-MM-DD' or 'YYYY'
+
+        Returns:
+            Year as integer, or None if invalid
+        """
+        if not release_date:
+            return None
+
+        try:
+            # Release date can be 'YYYY-MM-DD', 'YYYY-MM', or just 'YYYY'
+            year = int(release_date.split('-')[0])
+            return year if 1900 <= year <= 2100 else None
+        except (ValueError, IndexError):
+            return None
+
+    def _get_primary_genre(self, artist_ids: List[str]) -> Optional[str]:
+        """
+        Get primary genre from the first artist's genres.
+
+        Args:
+            artist_ids: List of Spotify artist IDs
+
+        Returns:
+            Primary genre string, or None if no genres found
+        """
+        if not artist_ids:
+            return None
+
+        # Get genres from first artist
+        genres = self.get_artist_genres(artist_ids[0])
+        return genres[0] if genres else None
 
     def search_track(self, title: str, artist: str) -> Optional[Dict[str, str]]:
         """
@@ -55,12 +109,17 @@ class SpotifyClient:
 
             track = results['tracks']['items'][0]
 
+            # Extract artist IDs for genre lookup
+            artist_ids = [artist['id'] for artist in track['artists']]
+
             return {
                 'title': track['name'],
                 'artist': ', '.join(artist['name'] for artist in track['artists']),
                 'spotify_id': track['id'],
                 'album': track['album']['name'],
                 'release_date': track['album']['release_date'],
+                'release_year': self._extract_year(track['album']['release_date']),
+                'primary_genre': self._get_primary_genre(artist_ids),
             }
 
         except Exception as e:
@@ -130,12 +189,18 @@ class SpotifyClient:
                         continue
 
                     track = item['track']
+
+                    # Extract artist IDs for genre lookup
+                    artist_ids = [artist['id'] for artist in track['artists']]
+
                     tracks.append({
                         'title': track['name'],
                         'artist': ', '.join(artist['name'] for artist in track['artists']),
                         'spotify_id': track['id'],
                         'album': track['album']['name'],
                         'release_date': track['album']['release_date'],
+                        'release_year': self._extract_year(track['album']['release_date']),
+                        'primary_genre': self._get_primary_genre(artist_ids),
                     })
 
                 # Get next page if available

@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { fuzzyMatch } from "@/lib/game/fuzzy-match";
 import { calculatePoints } from "@/lib/game/state-machine";
 import { useSpotifyAuth } from "@/lib/spotify-auth-context";
@@ -96,8 +96,6 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     isEndingGame,
   } = useHost(id);
 
-  const { toast } = useToast();
-
   // Find host player (for solo mode)
   const hostPlayer = players.find((p) => p.is_host);
 
@@ -122,10 +120,8 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   const handleSubmitAnswer = async (answer: string) => {
     if (!hostPlayer || !currentTrack || !session) {
       console.error('Missing required data:', { hostPlayer, currentTrack, session });
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Missing required data. Please refresh the page.",
-        variant: "destructive",
       });
       return;
     }
@@ -133,10 +129,8 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     // Calculate elapsed time
     const roundStartTime = session.round_start_time;
     if (!roundStartTime) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Round has not started yet",
-        variant: "destructive",
       });
       return;
     }
@@ -178,10 +172,8 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
         },
         onError: (error) => {
           console.error('Submit answer error:', error);
-          toast({
-            title: "Failed to submit answer",
+          toast.error("Failed to submit answer", {
             description: error.message,
-            variant: "destructive",
           });
         },
       }
@@ -275,10 +267,8 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
           { sessionId: id, overrides },
           {
             onError: (error) => {
-              toast({
-                title: "Failed to finalize judgments",
+              toast.error("Failed to finalize judgments", {
                 description: error.message,
-                variant: "destructive",
               });
             },
           }

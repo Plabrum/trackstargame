@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Share2, Eye, X } from "lucide-react";
 import html2canvas from "html2canvas";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface ShareButtonProps {
   /** The element to capture and share */
@@ -18,14 +18,11 @@ interface ShareButtonProps {
 export function ShareButton({ targetRef, title = "My Trackstar Game Score", text }: ShareButtonProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const { toast } = useToast();
 
   const captureAndShare = async () => {
     if (!targetRef.current) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Content not ready to share",
-        variant: "destructive",
       });
       return;
     }
@@ -63,8 +60,7 @@ export function ShareButton({ targetRef, title = "My Trackstar Game Score", text
           files: [file],
         });
 
-        toast({
-          title: "Shared!",
+        toast.success("Shared!", {
           description: "Your score has been shared successfully",
         });
       } else {
@@ -78,8 +74,7 @@ export function ShareButton({ targetRef, title = "My Trackstar Game Score", text
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        toast({
-          title: "Downloaded!",
+        toast.success("Downloaded!", {
           description: "Your score card has been downloaded",
         });
       }
@@ -88,10 +83,8 @@ export function ShareButton({ targetRef, title = "My Trackstar Game Score", text
 
       // Only show error if it's not user cancellation
       if (error instanceof Error && error.name !== 'AbortError') {
-        toast({
-          title: "Share failed",
+        toast.error("Share failed", {
           description: "Could not share your score. Try downloading instead.",
-          variant: "destructive",
         });
       }
     } finally {

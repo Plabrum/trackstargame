@@ -64,6 +64,8 @@ export function HostFinalScore({ players, rounds, onPlayAgain, currentPlayerId }
       onPlayAgain={onPlayAgain}
       currentPlayerId={currentPlayerId}
       showUserInfo={true}
+      accessToken={accessToken}
+      albumArtUrl={albumArt}
     />
   );
 }

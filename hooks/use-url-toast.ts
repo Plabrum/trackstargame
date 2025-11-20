@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export interface UrlToastConfig {
   /**
@@ -47,7 +47,6 @@ export function useUrlToast(config: UrlToastConfig) {
   const { paramName = "error", messages, defaultMessage } = config;
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { toast } = useToast();
 
   useEffect(() => {
     const paramValue = searchParams.get(paramName);
@@ -57,10 +56,10 @@ export function useUrlToast(config: UrlToastConfig) {
 
       if (messageConfig) {
         // Show toast
-        toast({
-          title: messageConfig.title,
+        const title = messageConfig.title || (messageConfig.variant === "destructive" ? "Error" : "");
+        const toastFn = messageConfig.variant === "destructive" ? toast.error : toast;
+        toastFn(title, {
           description: messageConfig.description,
-          variant: messageConfig.variant || "default",
         });
       }
 
@@ -70,5 +69,5 @@ export function useUrlToast(config: UrlToastConfig) {
       url.searchParams.delete(paramName);
       router.replace(url.pathname + url.search, { scroll: false });
     }
-  }, [searchParams, paramName, messages, defaultMessage, toast, router]);
+  }, [searchParams, paramName, messages, defaultMessage, router]);
 }

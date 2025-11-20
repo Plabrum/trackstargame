@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy, Settings, Music, AlertTriangle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { GameSettingsForm } from "@/components/host/GameSettingsForm";
 import { PlayerList } from "@/components/shared/PlayerList";
 import { Header } from "@/components/shared/Header";
@@ -33,7 +33,6 @@ interface HostLobbyProps {
 }
 
 export function HostLobby({ session, players, onStartGame, isStarting, isSpotifyReady, spotifyError }: HostLobbyProps) {
-  const { toast } = useToast();
   const sessionId = session.id;
   const hostName = session.host_name;
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/play/${sessionId}` : "";
@@ -64,16 +63,14 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(sessionId);
-    toast({
-      title: "Copied!",
+    toast.success("Copied!", {
       description: "Game code copied to clipboard",
     });
   };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(joinUrl);
-    toast({
-      title: "Copied!",
+    toast.success("Copied!", {
       description: "Join link copied to clipboard",
     });
   };
@@ -217,10 +214,8 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
               // Then start the game
               onStartGame();
             } catch (error) {
-              toast({
-                title: "Error",
+              toast.error("Error", {
                 description: error instanceof Error ? error.message : "Failed to start game",
-                variant: "destructive",
               });
             }
           }}

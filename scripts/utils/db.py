@@ -71,6 +71,7 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
     Args:
         pack_id: UUID of the pack
         tracks: List of track dicts with 'title', 'artist', 'spotify_id'
+               and optionally 'release_year', 'album_name', 'primary_genre'
 
     Returns:
         Number of tracks added
@@ -83,7 +84,15 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
 
         # Prepare data for bulk insert
         values = [
-            (pack_id, track['title'], track['artist'], track['spotify_id'])
+            (
+                pack_id,
+                track['title'],
+                track['artist'],
+                track['spotify_id'],
+                track.get('release_year'),
+                track.get('album_name'),
+                track.get('primary_genre')
+            )
             for track in tracks
         ]
 
@@ -91,7 +100,7 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
         execute_values(
             cursor,
             """
-            INSERT INTO tracks (pack_id, title, artist, spotify_id)
+            INSERT INTO tracks (pack_id, title, artist, spotify_id, release_year, album_name, primary_genre)
             VALUES %s
             """,
             values
@@ -101,6 +110,35 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
 
         print(f"Added {len(tracks)} tracks to pack {pack_id}")
         return len(tracks)
+
+
+def update_track_metadata(track_id: str, release_year: Optional[int] = None,
+                         album_name: Optional[str] = None,
+                         primary_genre: Optional[str] = None) -> None:
+    """
+    Update metadata for an existing track.
+
+    Args:
+        track_id: UUID of the track
+        release_year: Release year (optional)
+        album_name: Album name (optional)
+        primary_genre: Primary genre (optional)
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE tracks
+            SET release_year = %s,
+                album_name = %s,
+                primary_genre = %s
+            WHERE id = %s
+            """,
+            (release_year, album_name, primary_genre, track_id)
+        )
+
+        cursor.close()
 
 
 def get_all_packs() -> List[Dict]:
@@ -159,7 +197,7 @@ def get_pack_tracks(pack_id: str) -> List[Dict]:
 
         cursor.execute(
             """
-            SELECT id, title, artist, spotify_id, created_at
+            SELECT id, title, artist, spotify_id, release_year, album_name, primary_genre, created_at
             FROM tracks
             WHERE pack_id = %s
             ORDER BY created_at
@@ -174,7 +212,10 @@ def get_pack_tracks(pack_id: str) -> List[Dict]:
                 'title': row[1],
                 'artist': row[2],
                 'spotify_id': row[3],
-                'created_at': row[4]
+                'release_year': row[4],
+                'album_name': row[5],
+                'primary_genre': row[6],
+                'created_at': row[7]
             })
 
         cursor.close()

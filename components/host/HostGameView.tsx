@@ -283,11 +283,11 @@ export function HostGameView({
                           <CardContent className="pt-4">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
-                                <p className="font-bold">{player?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Answer: <span className="font-medium text-foreground">{answer.submitted_answer}</span>
+                                <p className="font-bold text-gray-900">{player?.name}</p>
+                                <p className="text-sm text-gray-700">
+                                  Answer: <span className="font-medium text-gray-900">{answer.submitted_answer}</span>
                                 </p>
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-xs text-gray-600 mt-1">
                                   Auto-validated: {answer.auto_validated ? '✓ Correct' : '✗ Incorrect'}
                                   {(answer.points_awarded ?? 0) > 0 && ` (+${answer.points_awarded} pts)`}
                                 </p>

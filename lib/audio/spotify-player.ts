@@ -57,25 +57,38 @@ export class SpotifyPlayer {
    */
   async initialize(deviceName: string = 'Trackstar Game'): Promise<void> {
     if (this.isInitialized) {
-      console.warn('SpotifyPlayer already initialized');
+      console.warn('[SpotifyPlayer] Already initialized');
       return;
     }
 
-    // Set up the callback BEFORE loading the SDK
-    const sdkReadyPromise = new Promise<void>((resolve) => {
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        resolve();
-      };
-    });
+    console.log('[SpotifyPlayer] Starting initialization...');
 
-    // Load Spotify SDK script
-    if (!window.Spotify) {
+    // Check if SDK is already loaded and ready
+    if (window.Spotify) {
+      console.log('[SpotifyPlayer] SDK already loaded');
+    } else {
+      console.log('[SpotifyPlayer] Loading SDK...');
+      // Set up the callback BEFORE loading the SDK
+      const sdkReadyPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Spotify SDK failed to load within 10 seconds'));
+        }, 10000);
+
+        window.onSpotifyWebPlaybackSDKReady = () => {
+          console.log('[SpotifyPlayer] SDK ready callback fired');
+          clearTimeout(timeout);
+          resolve();
+        };
+      });
+
+      // Load Spotify SDK script
       await this.loadSpotifySDK();
+
+      // Wait for SDK to be ready
+      await sdkReadyPromise;
     }
 
-    // Wait for SDK to be ready
-    await sdkReadyPromise;
-
+    console.log('[SpotifyPlayer] Creating player instance...');
     // Create player instance
     this.player = new window.Spotify.Player({
       name: deviceName,
@@ -88,14 +101,31 @@ export class SpotifyPlayer {
     // Set up event listeners
     this.setupEventListeners();
 
-    // Connect to the player
+    // Connect to the player with timeout
     if (!this.player) {
       throw new Error('Failed to create Spotify player');
     }
 
-    const connected = await this.player.connect();
-    if (!connected) {
-      throw new Error('Failed to connect to Spotify player');
+    console.log('[SpotifyPlayer] Connecting to player...');
+    try {
+      const connected = await Promise.race([
+        this.player.connect(),
+        new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error('Player connection timeout after 15 seconds')), 15000)
+        ),
+      ]);
+
+      if (!connected) {
+        throw new Error('Failed to connect to Spotify player');
+      }
+
+      console.log('[SpotifyPlayer] Player connected successfully');
+    } catch (error) {
+      console.error('[SpotifyPlayer] Connection failed:', error);
+      // Cleanup on connection failure
+      this.player.disconnect();
+      this.player = null;
+      throw error;
     }
 
     this.isInitialized = true;
@@ -117,27 +147,38 @@ export class SpotifyPlayer {
    * This is required before you can play tracks on the device.
    */
   private async transferPlayback(deviceId: string): Promise<void> {
-    const response = await fetch('https://api.spotify.com/v1/me/player', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.accessToken}`,
-      },
-      body: JSON.stringify({
-        device_ids: [deviceId],
-        play: false, // Don't start playing immediately
-      }),
-    });
+    console.log('Transferring playback to device:', deviceId);
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to transfer playback: ${error}`);
+    try {
+      const response = await fetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+        body: JSON.stringify({
+          device_ids: [deviceId],
+          play: false, // Don't start playing immediately
+        }),
+      });
+
+      // 202 = success, 204 = success but no content, 404 = no active device (which is ok for initial transfer)
+      if (!response.ok && response.status !== 404 && response.status !== 204) {
+        const errorText = await response.text();
+        console.error('Transfer playback error:', response.status, errorText);
+        throw new Error(`Failed to transfer playback (${response.status}): ${errorText}`);
+      }
+
+      console.log('Transfer playback request sent, status:', response.status);
+    } catch (error) {
+      console.error('Transfer playback request failed:', error);
+      throw error;
     }
 
-    // Poll for device to become active (max 5 seconds)
+    // Poll for device to become active (max 8 seconds)
     await new Promise<void>((resolve, reject) => {
       const startTime = Date.now();
-      const maxWaitMs = 5000;
+      const maxWaitMs = 8000;
       const pollIntervalMs = 500;
 
       const checkDevice = async () => {
@@ -150,16 +191,26 @@ export class SpotifyPlayer {
 
           if (stateResponse.status === 200) {
             const state = await stateResponse.json();
-            if (state.device?.id === deviceId && state.device?.is_active) {
-              console.log('Device is now active');
-              resolve();
-              return;
+            if (state.device?.id === deviceId) {
+              if (state.device?.is_active) {
+                console.log('Device is now active');
+                resolve();
+                return;
+              } else {
+                console.log('Device found but not active yet, continuing to poll...');
+              }
+            } else {
+              console.log('Waiting for correct device, current:', state.device?.id);
             }
+          } else if (stateResponse.status === 204) {
+            // No active device yet, keep waiting
+            console.log('No active device yet (204), continuing to poll...');
           }
 
           // Check if we've exceeded max wait time
           if (Date.now() - startTime >= maxWaitMs) {
-            console.warn('Device activation timeout - proceeding anyway');
+            console.warn('Device activation timeout after', maxWaitMs, 'ms - proceeding anyway');
+            // Resolve anyway, the device might still work for playback
             resolve();
             return;
           }
@@ -168,7 +219,8 @@ export class SpotifyPlayer {
           setTimeout(checkDevice, pollIntervalMs);
         } catch (error) {
           console.error('Error checking device state:', error);
-          reject(error);
+          // Don't reject on polling errors, just log and continue
+          setTimeout(checkDevice, pollIntervalMs);
         }
       };
 
@@ -181,18 +233,18 @@ export class SpotifyPlayer {
 
     // Ready
     this.player.addListener('ready', ({ device_id }) => {
-      console.log('Spotify Player Ready', device_id);
+      console.log('[SpotifyPlayer] Player ready event received, device_id:', device_id);
       this.deviceId = device_id;
 
       // Transfer playback to this device to make it active
       this.transferPlayback(device_id)
         .then(() => {
-          console.log('Playback transferred to device');
+          console.log('[SpotifyPlayer] Playback transferred successfully, calling onReady callback');
           this.callbacks.onReady?.();
         })
         .catch((err) => {
-          console.error('Failed to transfer playback:', err);
-          this.callbacks.onError?.('Failed to activate device. Please try again.');
+          console.error('[SpotifyPlayer] Failed to transfer playback:', err);
+          this.callbacks.onError?.(`Failed to activate device: ${err.message}`);
         });
     });
 
@@ -204,23 +256,23 @@ export class SpotifyPlayer {
 
     // Errors
     this.player.addListener('initialization_error', ({ message }) => {
-      console.error('Initialization Error:', message);
-      this.callbacks.onError?.(message);
+      console.error('[SpotifyPlayer] Initialization Error:', message);
+      this.callbacks.onError?.(`Initialization error: ${message}`);
     });
 
     this.player.addListener('authentication_error', ({ message }) => {
-      console.error('Authentication Error:', message);
+      console.error('[SpotifyPlayer] Authentication Error:', message);
       this.callbacks.onError?.('Authentication failed. Please sign in again.');
     });
 
     this.player.addListener('account_error', ({ message }) => {
-      console.error('Account Error:', message);
+      console.error('[SpotifyPlayer] Account Error:', message);
       this.callbacks.onError?.('Account error. Spotify Premium may be required.');
     });
 
     this.player.addListener('playback_error', ({ message }) => {
-      console.error('Playback Error:', message);
-      this.callbacks.onError?.(message);
+      console.error('[SpotifyPlayer] Playback Error:', message);
+      this.callbacks.onError?.(`Playback error: ${message}`);
     });
 
     // Player state changes
