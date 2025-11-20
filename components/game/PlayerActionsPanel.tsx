@@ -82,7 +82,7 @@ export function PlayerActionsPanel({
       {buzzAction && (
         <Button
           size="lg"
-          className="w-full h-32 text-3xl font-bold bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 active:scale-95 transition-transform"
+          className="w-full h-32 text-3xl font-bold bg-orange hover:bg-orange/90 active:scale-95 transition-transform"
           onClick={() => handleAction(buzzAction.action)}
           disabled={!buzzAction.enabled || isBuzzing}
           title={buzzAction.description}

@@ -7,8 +7,11 @@ import { Toaster } from "@/components/ui/toaster";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Trackstar - Music Guessing Game",
-  description: "A multiplayer music guessing game with buzz-in mechanics",
+  title: "Trackstar Game",
+  description: "Name the artist, win $5 *(no actual money involved)",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -24,7 +27,7 @@ export default function RootLayout({
             <main className="flex-1">
               {children}
             </main>
-            <footer className="py-4 text-center text-sm text-muted-foreground border-t">
+            <footer className="py-4 text-center text-sm text-muted-foreground">
               Made by Phil Labrum © 2025
             </footer>
           </div>

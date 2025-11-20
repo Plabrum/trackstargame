@@ -98,7 +98,6 @@ export type Database = {
       game_sessions: {
         Row: {
           allow_host_to_play: boolean
-          allow_single_user: boolean
           created_at: string | null
           current_round: number | null
           enable_text_input_mode: boolean
@@ -112,7 +111,6 @@ export type Database = {
         }
         Insert: {
           allow_host_to_play?: boolean
-          allow_single_user?: boolean
           created_at?: string | null
           current_round?: number | null
           enable_text_input_mode?: boolean
@@ -126,7 +124,6 @@ export type Database = {
         }
         Update: {
           allow_host_to_play?: boolean
-          allow_single_user?: boolean
           created_at?: string | null
           current_round?: number | null
           enable_text_input_mode?: boolean

@@ -50,37 +50,37 @@ export function Leaderboard({
 
   const getRankBadgeStyles = (index: number, isCurrentPlayer: boolean) => {
     if (isCurrentPlayer) {
-      return 'bg-purple-500 text-white';
+      return 'bg-orange text-white';
     }
 
     switch (index) {
       case 0: return 'bg-yellow-400 text-yellow-900';
       case 1: return 'bg-slate-300 text-slate-700';
-      case 2: return variant === 'final' ? 'bg-orange-400 text-orange-900' : 'bg-orange-300 text-orange-900';
+      case 2: return variant === 'final' ? 'bg-orange/80 text-white' : 'bg-orange/60 text-white';
       default: return 'bg-slate-200 text-slate-600';
     }
   };
 
   const getRowBackgroundStyles = (index: number, isCurrentPlayer: boolean) => {
     if (isCurrentPlayer) {
-      return 'bg-purple-100 border-2 border-purple-300';
+      return 'bg-orange/10 border-2 border-orange/30';
     }
 
     if (variant === 'host') {
-      return index === 0 ? 'bg-yellow-100 border border-yellow-300' : 'bg-slate-50';
+      return index === 0 ? 'bg-yellow-900/30 border border-yellow-500/50' : 'bg-card border border-border';
     }
 
     if (variant === 'final') {
       switch (index) {
-        case 0: return 'bg-gradient-to-r from-yellow-100 to-yellow-50';
-        case 1: return 'bg-slate-100';
-        case 2: return 'bg-orange-50';
-        default: return 'bg-slate-50';
+        case 0: return 'bg-gradient-to-r from-yellow-900/30 to-yellow-900/20';
+        case 1: return 'bg-card border border-border';
+        case 2: return 'bg-orange/10';
+        default: return 'bg-card border border-border';
       }
     }
 
     // live variant
-    return index === 0 ? 'bg-gradient-to-r from-yellow-100 to-yellow-50' : 'bg-slate-50';
+    return index === 0 ? 'bg-gradient-to-r from-yellow-900/30 to-yellow-900/20' : 'bg-card border border-border';
   };
 
   return (
@@ -135,12 +135,12 @@ export function Leaderboard({
                     <span className={`${nameSize} ${isCurrentPlayer ? 'font-bold' : ''}`}>
                       {player.name}
                       {isCurrentPlayer && (
-                        <span className="ml-2 text-sm text-purple-600 font-semibold">(You)</span>
+                        <span className="ml-2 text-sm text-orange font-semibold">(You)</span>
                       )}
                     </span>
                   </div>
                 </div>
-                <span className={`font-bold ${scoreSize} ${isCurrentPlayer ? 'text-purple-600' : ''}`}>
+                <span className={`font-bold ${scoreSize} ${isCurrentPlayer ? 'text-orange' : ''}`}>
                   {animateScores && variant === 'live' ? (
                     <AnimatedScore score={score} />
                   ) : (

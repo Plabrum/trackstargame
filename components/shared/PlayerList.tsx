@@ -88,15 +88,15 @@ export function PlayerList({
                   key={player.id}
                   className={`flex items-center gap-3 p-3 rounded-lg ${
                     isCurrentPlayer
-                      ? 'bg-green-50 border border-green-200'
-                      : 'bg-slate-50'
+                      ? 'bg-green-900/20 border border-green-500/30'
+                      : 'bg-card border border-border'
                   }`}
                 >
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full font-semibold ${
                       isCurrentPlayer
                         ? 'bg-green-500 text-white'
-                        : 'bg-purple-100 text-purple-600'
+                        : 'bg-orange/20 text-orange'
                     }`}
                   >
                     {index + 1}
@@ -106,7 +106,7 @@ export function PlayerList({
                     playerBadge(player)
                   ) : (
                     isCurrentPlayer && (
-                      <Badge variant="outline" className="bg-white">You</Badge>
+                      <Badge variant="outline" className="bg-card">You</Badge>
                     )
                   )}
                 </div>

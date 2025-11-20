@@ -45,10 +45,19 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     queryFn: async () => {
       if (!currentRound?.track_id) return null;
 
-      const response = await fetch(`/api/tracks/${currentRound.track_id}`);
-      if (!response.ok) return null;
+      const supabase = await import('@/lib/supabase/client').then(m => m.createClient());
+      const { data, error } = await supabase
+        .from('tracks')
+        .select('*')
+        .eq('id', currentRound.track_id)
+        .single();
 
-      return response.json();
+      if (error) {
+        console.error('Failed to fetch track:', error);
+        return null;
+      }
+
+      return data;
     },
     enabled: !!currentRound?.track_id && !!session && (session.state === 'buzzed' || session.state === 'reveal'),
   });

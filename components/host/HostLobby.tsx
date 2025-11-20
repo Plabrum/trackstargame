@@ -11,6 +11,7 @@ import { Copy, Settings, Music, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GameSettingsForm } from "@/components/host/GameSettingsForm";
 import { PlayerList } from "@/components/shared/PlayerList";
+import { Header } from "@/components/shared/Header";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -22,7 +23,6 @@ interface HostLobbyProps {
   onStartGame: (settings?: {
     totalRounds?: number;
     allowHostToPlay?: boolean;
-    allowSingleUser?: boolean;
     enableTextInputMode?: boolean;
   }) => void;
   isStarting: boolean;
@@ -37,7 +37,8 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/play/${sessionId}` : "";
 
   // Track settings in state (not saved until game starts)
-  const initialGameMode = session.allow_single_user ? 'solo' : 'party';
+  // Solo mode = host plays + text input enabled
+  const initialGameMode = session.allow_host_to_play && session.enable_text_input_mode ? 'solo' : 'party';
   const [totalRounds, setTotalRounds] = useState(session.total_rounds);
   const [gameMode, setGameMode] = useState<'solo' | 'party'>(initialGameMode);
   const [partyTextInput, setPartyTextInput] = useState(session.enable_text_input_mode ?? false);
@@ -48,13 +49,10 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   let minPlayers = 2;
 
   // Derive settings from game mode for min player calculation
-  const allowSingleUser = gameMode === 'solo';
   const allowHostToPlay = gameMode === 'solo' || (partyTextInput && partyHostPlays);
 
-  if (allowSingleUser) {
-    minPlayers = 0; // Allow solo play
-  } else if (allowHostToPlay) {
-    minPlayers = 1; // Host counts as 1, need at least 1 other player
+  if (allowHostToPlay) {
+    minPlayers = 0; // Host can play solo
   }
 
   const canStart = players.length >= minPlayers && players.length <= maxPlayers && isSpotifyReady;
@@ -78,37 +76,21 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold">Game Lobby</h1>
-        <p className="text-muted-foreground">Host: {hostName}</p>
-      </div>
+      <Header title="Game Lobby" showUserInfo />
 
       {/* Game Mode & Settings - Always Visible */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Game Configuration
-          </CardTitle>
-          <CardDescription>
-            Choose your game mode and settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GameSettingsForm
-            session={session}
-            embedded
-            totalRounds={totalRounds}
-            onTotalRoundsChange={setTotalRounds}
-            gameMode={gameMode}
-            onGameModeChange={setGameMode}
-            partyTextInput={partyTextInput}
-            onPartyTextInputChange={setPartyTextInput}
-            partyHostPlays={partyHostPlays}
-            onPartyHostPlaysChange={setPartyHostPlays}
-          />
-        </CardContent>
-      </Card>
+      <GameSettingsForm
+        session={session}
+        embedded
+        totalRounds={totalRounds}
+        onTotalRoundsChange={setTotalRounds}
+        gameMode={gameMode}
+        onGameModeChange={setGameMode}
+        partyTextInput={partyTextInput}
+        onPartyTextInputChange={setPartyTextInput}
+        partyHostPlays={partyHostPlays}
+        onPartyHostPlaysChange={setPartyHostPlays}
+      />
 
       {/* Party Mode: Show QR Code & Players */}
       {gameMode === 'party' && (
@@ -127,7 +109,7 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
 
               {/* Game Code */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between p-4 bg-slate-100 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Game Code</p>
                     <p className="text-2xl font-mono font-bold">{sessionId.slice(0, 8).toUpperCase()}</p>
@@ -146,7 +128,7 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
                     type="text"
                     readOnly
                     value={joinUrl}
-                    className="flex-1 px-3 py-2 text-sm bg-slate-100 rounded-md truncate"
+                    className="flex-1 px-3 py-2 text-sm bg-card border border-border rounded-md truncate text-white"
                   />
                   <Button size="sm" variant="outline" onClick={handleCopyLink}>
                     <Copy className="h-4 w-4" />
@@ -196,60 +178,41 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
       )}
 
       {/* Start Game Section */}
-      <Card className="border-2 border-primary">
-        <CardContent className="pt-6">
-          {!canStart && (
-            <Alert className="mb-4">
-              <AlertDescription>
-                {!isSpotifyReady
-                  ? "Waiting for Spotify player to initialize..."
-                  : gameMode === 'solo'
-                  ? "Ready to start! You'll be playing solo."
-                  : players.length < minPlayers
+      {!canStart && (
+        <Alert className="mb-4">
+          <AlertDescription>
+            {!isSpotifyReady
+              ? "Waiting for Spotify player to initialize..."
+              : gameMode === 'solo'
+                ? "Ready to start! You'll be playing solo."
+                : players.length < minPlayers
                   ? allowHostToPlay
                     ? `Need at least ${minPlayers} other player to join (currently ${players.length})`
                     : `Need at least ${minPlayers} players to start (currently ${players.length})`
                   : `Too many players! Maximum is ${maxPlayers} (currently ${players.length})`}
-              </AlertDescription>
-            </Alert>
-          )}
+          </AlertDescription>
+        </Alert>
+      )}
 
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={() => {
-              // Derive settings from current state
-              const enableTextInputMode = gameMode === 'solo' || partyTextInput;
-              const settings = {
-                totalRounds,
-                allowHostToPlay,
-                allowSingleUser,
-                enableTextInputMode,
-              };
-              onStartGame(settings);
-            }}
-            disabled={!canStart || isStarting}
-          >
-            {isStarting ? "Starting Game..." : "Start Game"}
-          </Button>
+      <div className="flex justify-center">
+        <Button
+          onClick={() => {
+            // Derive settings from current state
+            const enableTextInputMode = gameMode === 'solo' || partyTextInput;
+            const settings = {
+              totalRounds,
+              allowHostToPlay,
+              enableTextInputMode,
+            };
+            onStartGame(settings);
+          }}
+          disabled={!canStart || isStarting}
+          className="px-12 py-3 text-lg font-bold bg-orange hover:bg-orange/90 text-white rounded-full"
+        >
+          {isStarting ? "Starting Game..." : "Start Game"}
+        </Button>
+      </div>
 
-          <Separator className="my-4" />
-
-          <div className="text-sm text-muted-foreground text-center space-y-1">
-            {gameMode === 'solo' ? (
-              <>
-                <p>Ready to test your music knowledge?</p>
-                <p>You&apos;ll type in artist names as songs play!</p>
-              </>
-            ) : (
-              <>
-                <p>Once you start, the game will begin immediately</p>
-                <p>Make sure all players are ready!</p>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

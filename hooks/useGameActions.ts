@@ -58,7 +58,6 @@ export function useGameActions({
       totalRounds: session.total_rounds,
 
       // Settings
-      allowSingleUser: session.allow_single_user,
       allowHostToPlay: session.allow_host_to_play,
       enableTextInputMode: session.enable_text_input_mode,
 

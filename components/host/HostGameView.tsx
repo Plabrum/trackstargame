@@ -14,10 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music, CheckCircle2, XCircle } from "lucide-react";
 import { BuzzAnimation } from "@/components/game/BuzzAnimation";
+import { AnimatedScore } from "@/components/game/ScoreAnimation";
 import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
 import { HostActionsPanel } from "./HostActionsPanel";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
+import { Header } from "@/components/shared/Header";
 import type { Tables } from "@/lib/types/database";
 import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
 
@@ -136,7 +138,7 @@ export function HostGameView({
   const renderStateInfo = () => {
     switch (state) {
       case 'playing':
-        if (session.allow_single_user && session.enable_text_input_mode && hasSubmittedAnswer) {
+        if (players.length === 1 && session.enable_text_input_mode && hasSubmittedAnswer) {
           return (
             <Alert>
               <AlertDescription className="text-center py-4">
@@ -152,7 +154,7 @@ export function HostGameView({
               <p className="text-lg font-semibold">Music is playing...</p>
               <p className="text-sm text-muted-foreground mt-2">
                 {session.enable_text_input_mode
-                  ? session.allow_single_user
+                  ? players.length === 1
                     ? "Type the artist/band name when you know it!"
                     : "Waiting for players to submit answers"
                   : "Waiting for a player to buzz in"}
@@ -190,7 +192,7 @@ export function HostGameView({
         );
 
       case 'reveal':
-        if (session.allow_single_user && session.enable_text_input_mode && answerFeedback) {
+        if (players.length === 1 && session.enable_text_input_mode && answerFeedback) {
           return (
             <Alert className={`border-2 ${
               answerFeedback.isCorrect
@@ -217,7 +219,7 @@ export function HostGameView({
 
         if (currentTrack) {
           return (
-            <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
+            <div className="text-center p-6 bg-orange/10 rounded-lg border border-orange/20">
               <p className="text-sm text-muted-foreground mb-2">Track Revealed</p>
               <p className="text-2xl font-bold">{currentTrack.title}</p>
               <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
@@ -240,30 +242,28 @@ export function HostGameView({
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl space-y-6">
-      {/* Buzz Animation Overlay */}
-      <BuzzAnimation
-        show={showBuzzAnimation}
-        playerName={buzzerPlayer?.name}
-        isCorrect={null}
-      />
+    <>
+      <div className="container mx-auto p-6 max-w-6xl space-y-6 pb-32">
+        {/* Buzz Animation Overlay */}
+        <BuzzAnimation
+          show={showBuzzAnimation}
+          playerName={buzzerPlayer?.name}
+          isCorrect={null}
+        />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Round {currentRoundNum} / {totalRounds}</h1>
-          <p className="text-muted-foreground">Host Controls</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="text-sm px-3 py-1">
-            {session.allow_single_user ? 'Solo Mode' : 'Party Mode'}
-            {session.enable_text_input_mode && ' + Text Input'}
-            {hostPlayerId && ' | Host Player: ✓'}
-          </Badge>
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            {getStateLabel()}
-          </Badge>
-        </div>
+      <Header title={`Round ${currentRoundNum} / ${totalRounds}`} showUserInfo />
+
+      {/* Game Status */}
+      <div className="flex items-center justify-center gap-3">
+        <Badge variant="secondary" className="text-sm px-3 py-1">
+          {players.length === 1 ? 'Solo Mode' : 'Party Mode'}
+          {session.enable_text_input_mode && ' + Text Input'}
+          {hostPlayerId && ' | Host Player: ✓'}
+        </Badge>
+        <Badge variant="outline" className="text-lg px-4 py-2">
+          {getStateLabel()}
+        </Badge>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -283,7 +283,7 @@ export function HostGameView({
 
               {/* Solo Mode Text Input */}
               {state === 'playing' &&
-               session.allow_single_user &&
+               players.length === 1 &&
                session.enable_text_input_mode &&
                !hasSubmittedAnswer &&
                !answerFeedback &&
@@ -374,17 +374,6 @@ export function HostGameView({
             </CardContent>
           </Card>
 
-          {/* Spotify Playback Controls */}
-          {isSpotifyReady && playbackState?.track && (
-            <SpotifyPlaybackControls
-              playbackState={playbackState}
-              onPlayPause={onPlayPause}
-              onVolumeChange={onVolumeChange}
-              showControls={true}
-              hideTrackDetails={session.allow_host_to_play}
-            />
-          )}
-
           {/* Round Summary (when revealed) */}
           {state === 'reveal' && buzzerPlayer && (
             <Card>
@@ -393,15 +382,15 @@ export function HostGameView({
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded">
+                  <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
                     <span className="text-muted-foreground">First Buzz</span>
                     <span className="font-semibold">{buzzerPlayer.name}</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded">
+                  <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
                     <span className="text-muted-foreground">Time</span>
                     <span className="font-semibold">{elapsedSeconds?.toFixed(2)}s</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded">
+                  <div className="flex justify-between items-center p-3 bg-card border border-border rounded">
                     <span className="text-muted-foreground">Points</span>
                     <span className="font-semibold">
                       {Math.max(1, Math.round((30 - (elapsedSeconds || 0)) * 10) / 10)}
@@ -413,15 +402,49 @@ export function HostGameView({
           )}
         </div>
 
-        {/* Leaderboard */}
+        {/* Score Display - conditional based on player count */}
         <div>
-          <Leaderboard
-            players={players}
-            variant="host"
-            className="sticky top-6"
-          />
+          {players.length === 1 ? (
+            <Card className="sticky top-6">
+              <CardHeader>
+                <CardTitle>Current Score</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-6">
+                  <div className="text-6xl font-bold text-orange">
+                    <AnimatedScore score={players[0]?.score ?? 0} />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Keep going! 🎵
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Leaderboard
+              players={players}
+              variant="host"
+              className="sticky top-6"
+            />
+          )}
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Spotify Playback Controls - Sticky Bottom */}
+      {isSpotifyReady && playbackState?.track && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="container mx-auto max-w-6xl p-4">
+            <SpotifyPlaybackControls
+              playbackState={playbackState}
+              onPlayPause={onPlayPause}
+              onVolumeChange={onVolumeChange}
+              showControls={true}
+              hideTrackDetails={session.allow_host_to_play}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

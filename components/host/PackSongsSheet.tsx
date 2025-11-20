@@ -56,7 +56,7 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
       <SheetContent side="right" className="w-full sm:w-1/2 sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Music className="h-5 w-5 text-purple-600" />
+            <Music className="h-5 w-5 text-orange" />
             {pack?.name || 'Pack Songs'}
           </SheetTitle>
           <SheetDescription>
@@ -93,10 +93,10 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
                   {tracks.map((track, index) => (
                     <div
                       key={track.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:bg-card/80 transition-colors"
                     >
                       {/* Track number */}
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-purple-700 font-semibold text-sm flex-shrink-0">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange/20 text-orange font-semibold text-sm flex-shrink-0">
                         {index + 1}
                       </div>
 

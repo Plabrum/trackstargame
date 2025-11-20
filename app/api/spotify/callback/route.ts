@@ -57,34 +57,39 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
 
-    console.log('[Spotify Callback] Cookies set, returning HTML with client-side redirect');
+    console.log('[Spotify Callback] Cookies set, redirecting to select pack page');
 
-    // Use client-side redirect because server-side redirects don't include
-    // the Set-Cookie headers in the subsequent request
+    // Use client-side redirect with minimal delay to ensure cookies are set
+    // The /host page has loading.tsx which will show skeletons immediately
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <title>Redirecting...</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background: #000;
+            }
+          </style>
         </head>
         <body>
-          <p>Authenticating...</p>
           <script>
-            window.location.href = '/host/select-pack';
+            // Immediate redirect - loading.tsx will handle the loading state
+            window.location.href = '/host';
           </script>
         </body>
       </html>
     `;
 
-    const response = new NextResponse(html, {
+    return new NextResponse(html, {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
       },
     });
-
-    return response;
   } catch (error) {
     console.error('[Spotify Callback] Token exchange failed:', error);
     return NextResponse.redirect(new URL('/?error=token_exchange_failed', request.url));

@@ -15,10 +15,10 @@ export default async function HostLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, error } = await getAuthenticatedUser();
+  const { user, accessToken, error } = await getAuthenticatedUser();
 
   // Redirect if not authenticated - provider requires non-null user
-  if (!user) {
+  if (!user || !accessToken) {
     console.log('[HostLayout] User not authenticated, redirecting to home', { error });
 
     // Add error parameter if there was an auth error
@@ -29,9 +29,9 @@ export default async function HostLayout({
     redirect('/');
   }
 
-  // User is guaranteed to be non-null here
+  // User and accessToken are guaranteed to be non-null here
   return (
-    <SpotifyAuthProvider user={user}>
+    <SpotifyAuthProvider user={user} accessToken={accessToken}>
       {children}
     </SpotifyAuthProvider>
   );

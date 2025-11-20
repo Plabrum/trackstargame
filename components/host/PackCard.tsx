@@ -36,7 +36,7 @@ export function PackCard({
         <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
             <CardTitle className="text-xl flex items-center gap-2">
-              <Music className="h-5 w-5 text-purple-600" />
+              <Music className="h-5 w-5 text-orange" />
               {pack.name}
             </CardTitle>
             {pack.description && (
@@ -60,7 +60,7 @@ export function PackCard({
           View Songs
         </Button>
         <Button
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          className="w-full"
           onClick={onStartGame}
           disabled={isStarting || trackCount === 0}
         >

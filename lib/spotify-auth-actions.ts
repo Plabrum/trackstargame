@@ -62,6 +62,7 @@ async function getValidToken(): Promise<{
  */
 export async function getAuthenticatedUser(): Promise<{
   user: SpotifyUser | null;
+  accessToken?: string;
   error?: string;
 }> {
   // Get token (middleware already refreshed if needed)
@@ -73,7 +74,11 @@ export async function getAuthenticatedUser(): Promise<{
   }
 
   // Fetch user with valid token
-  return fetchSpotifyUser(accessToken);
+  const result = await fetchSpotifyUser(accessToken);
+  return {
+    ...result,
+    accessToken, // Include access token for client-side use (e.g., Web Playback SDK)
+  };
 }
 
 /**

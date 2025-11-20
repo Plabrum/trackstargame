@@ -15,7 +15,7 @@ import { cookies } from 'next/headers';
  * Requires Spotify authentication via httpOnly cookies.
  * This endpoint validates the host's Spotify token and creates a game session.
  *
- * Request: { packId: string, totalRounds?: number, allowHostToPlay?: boolean, allowSingleUser?: boolean, enableTextInputMode?: boolean }
+ * Request: { packId: string, totalRounds?: number, allowHostToPlay?: boolean, enableTextInputMode?: boolean }
  * Response: { id, code, host_name, pack_id, state, current_round, ... }
  */
 export async function POST(request: Request) {
@@ -51,9 +51,8 @@ export async function POST(request: Request) {
     const {
       packId,
       totalRounds = 10,
-      allowHostToPlay = false,
-      allowSingleUser = false,
-      enableTextInputMode = false,
+      allowHostToPlay = true,
+      enableTextInputMode = true,
     } = body;
 
     if (!packId) {
@@ -88,7 +87,6 @@ export async function POST(request: Request) {
         current_round: 0,
         total_rounds: totalRounds,
         allow_host_to_play: allowHostToPlay,
-        allow_single_user: allowSingleUser,
         enable_text_input_mode: enableTextInputMode,
       })
       .select('*')

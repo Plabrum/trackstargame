@@ -98,3 +98,54 @@ class SpotifyClient:
                 print(f"  ✗ Not found on Spotify")
 
         return results
+
+    def get_playlist_tracks(self, playlist_id: str) -> tuple[Optional[str], list]:
+        """
+        Get all tracks from a Spotify playlist.
+
+        Args:
+            playlist_id: Spotify playlist ID or URL
+
+        Returns:
+            Tuple of (playlist_name, list of track info dicts)
+        """
+        # Extract playlist ID from URL if needed
+        if 'spotify.com/playlist/' in playlist_id:
+            playlist_id = playlist_id.split('playlist/')[-1].split('?')[0]
+
+        try:
+            # Get playlist details
+            playlist = self.sp.playlist(playlist_id)
+            playlist_name = playlist['name']
+            print(f"Found playlist: {playlist_name}")
+            print(f"Total tracks: {playlist['tracks']['total']}")
+
+            # Get all tracks (handle pagination)
+            tracks = []
+            results = playlist['tracks']
+
+            while results:
+                for item in results['items']:
+                    if item['track'] is None:
+                        continue
+
+                    track = item['track']
+                    tracks.append({
+                        'title': track['name'],
+                        'artist': ', '.join(artist['name'] for artist in track['artists']),
+                        'spotify_id': track['id'],
+                        'album': track['album']['name'],
+                        'release_date': track['album']['release_date'],
+                    })
+
+                # Get next page if available
+                if results['next']:
+                    results = self.sp.next(results)
+                else:
+                    results = None
+
+            return playlist_name, tracks
+
+        except Exception as e:
+            print(f"Error fetching playlist: {e}")
+            return None, []

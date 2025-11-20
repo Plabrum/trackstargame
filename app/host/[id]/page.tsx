@@ -15,34 +15,15 @@ import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { fuzzyMatch } from "@/lib/game/fuzzy-match";
 import { calculatePoints } from "@/lib/game/state-machine";
+import { useSpotifyAuth } from "@/lib/spotify-auth-context";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
 
-  // Fetch Spotify access token (initialize once at page level)
-  const [accessToken, setAccessToken] = useState<string>('');
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  // Get Spotify access token from context
+  const { accessToken } = useSpotifyAuth();
   const [playerError, setPlayerError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('/api/spotify/token')
-      .then(res => res.json())
-      .then(data => {
-        if (data.accessToken) {
-          setAccessToken(data.accessToken);
-        } else {
-          setPlayerError('No Spotify access token found. Please sign in again.');
-        }
-      })
-      .catch(err => {
-        console.error('Failed to get access token:', err);
-        setPlayerError('Failed to get Spotify access token');
-      })
-      .finally(() => {
-        setIsLoadingAuth(false);
-      });
-  }, []);
 
   // Initialize Spotify player once at page level (persists across game states)
   const spotifyPlayer = useSpotifyPlayer({
@@ -81,10 +62,19 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     queryFn: async () => {
       if (!currentRound?.track_id) return null;
 
-      const response = await fetch(`/api/tracks/${currentRound.track_id}`);
-      if (!response.ok) return null;
+      const supabase = await import('@/lib/supabase/client').then(m => m.createClient());
+      const { data, error } = await supabase
+        .from('tracks')
+        .select('*')
+        .eq('id', currentRound.track_id)
+        .single();
 
-      return response.json();
+      if (error) {
+        console.error('Failed to fetch track:', error);
+        return null;
+      }
+
+      return data;
     },
     enabled: !!currentRound?.track_id && !!session && (session.state === 'playing' || session.state === 'buzzed' || session.state === 'reveal'),
   });
@@ -108,18 +98,6 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   // Find host player (for solo mode)
   const hostPlayer = players.find((p) => p.is_host);
 
-  // Debug: Log players and session
-  useEffect(() => {
-    console.log('Session settings:', {
-      allow_host_to_play: session?.allow_host_to_play,
-      allow_single_user: session?.allow_single_user,
-      enable_text_input_mode: session?.enable_text_input_mode,
-      state: session?.state,
-    });
-    console.log('Players:', players.map(p => ({ name: p.name, is_host: p.is_host, id: p.id })));
-    console.log('Host player:', hostPlayer);
-  }, [players, hostPlayer, session]);
-
   // Submit answer mutation (text input mode for solo mode)
   const submitAnswer = useSubmitAnswer();
   const [answerFeedback, setAnswerFeedback] = useState<{
@@ -132,6 +110,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     setAnswerFeedback(null);
     submitAnswer.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.current_round]);
 
   const handleSubmitAnswer = async (answer: string) => {
@@ -204,7 +183,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   };
 
   // Loading state
-  if (isLoadingSession || isLoadingPlayers || isLoadingAuth) {
+  if (isLoadingSession || isLoadingPlayers) {
     return (
       <div className="container mx-auto p-6 max-w-4xl space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -238,7 +217,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       <FinalScore
         players={players}
         rounds={rounds}
-        onPlayAgain={() => router.push("/host/select-pack")}
+        onPlayAgain={() => router.push("/host")}
       />
     );
   }

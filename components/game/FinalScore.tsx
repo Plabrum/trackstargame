@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Trophy, Medal, Award } from "lucide-react";
 import { Leaderboard } from "@/components/shared/Leaderboard";
+import { Header } from "@/components/shared/Header";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -26,12 +27,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <div className="text-center space-y-4">
-        <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-          Game Over!
-        </h1>
-        <p className="text-xl text-muted-foreground">Final Results</p>
-      </div>
+      <Header title="Game Over!" showUserInfo />
 
       {/* Winner Podium */}
       <Card className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-orange-50">
@@ -61,9 +57,9 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
               'text-orange-500',
             ];
             const bgColors = [
-              'bg-yellow-50',
-              'bg-slate-50',
-              'bg-orange-50',
+              'bg-yellow-900/20',
+              'bg-card',
+              'bg-orange/10',
             ];
 
             if (index === 0) return null; // Skip winner (already shown above)
@@ -103,16 +99,16 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-slate-50 rounded-lg">
-              <p className="text-3xl font-bold text-purple-600">{rounds.length}</p>
+            <div className="text-center p-4 bg-card border border-border rounded-lg">
+              <p className="text-3xl font-bold text-orange">{rounds.length}</p>
               <p className="text-sm text-muted-foreground mt-1">Rounds Played</p>
             </div>
-            <div className="text-center p-4 bg-slate-50 rounded-lg">
-              <p className="text-3xl font-bold text-purple-600">{players.length}</p>
+            <div className="text-center p-4 bg-card border border-border rounded-lg">
+              <p className="text-3xl font-bold text-orange">{players.length}</p>
               <p className="text-sm text-muted-foreground mt-1">Players</p>
             </div>
-            <div className="text-center p-4 bg-slate-50 rounded-lg">
-              <p className="text-3xl font-bold text-purple-600">
+            <div className="text-center p-4 bg-card border border-border rounded-lg">
+              <p className="text-3xl font-bold text-orange">
                 {sortedPlayers.length > 0 ? Math.max(...sortedPlayers.map(p => p.score ?? 0)) : 0}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Highest Score</p>

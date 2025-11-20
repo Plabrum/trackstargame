@@ -76,6 +76,7 @@ export function PlayerGameView({
 
   const hasBuzzed = buzzerPlayer?.id === currentPlayerId;
   const isTextInputMode = session.enable_text_input_mode ?? false;
+  const isSinglePlayer = players.length === 1;
 
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
@@ -143,7 +144,7 @@ export function PlayerGameView({
         // Default playing state message
         return (
           <div className="text-center mb-4">
-            <Music className="h-12 w-12 mx-auto text-purple-500 animate-pulse" />
+            <Music className="h-12 w-12 mx-auto text-orange animate-pulse" />
             <p className="text-lg font-semibold mt-2">Listening...</p>
             <p className="text-sm text-muted-foreground">
               {isTextInputMode
@@ -223,7 +224,7 @@ export function PlayerGameView({
             )}
 
             {currentTrack && (
-              <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
+              <div className="text-center p-6 bg-orange/10 rounded-lg border border-orange/20">
                 <p className="text-sm text-muted-foreground mb-2">Song Revealed</p>
                 <p className="text-2xl font-bold">{currentTrack.title}</p>
                 <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
@@ -298,13 +299,31 @@ export function PlayerGameView({
         </CardContent>
       </Card>
 
-      {/* Leaderboard */}
-      <Leaderboard
-        players={players}
-        currentPlayerId={currentPlayerId}
-        variant="live"
-        animateScores={true}
-      />
+      {/* Score Display - conditional based on player count */}
+      {isSinglePlayer ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-6">
+              <div className="text-6xl font-bold text-orange">
+                <AnimatedScore score={currentPlayer?.score ?? 0} />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Keep going! 🎵
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Leaderboard
+          players={players}
+          currentPlayerId={currentPlayerId}
+          variant="live"
+          animateScores={true}
+        />
+      )}
     </div>
   );
 }

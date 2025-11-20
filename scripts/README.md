@@ -80,6 +80,30 @@ uv run python scrape_channel.py --limit 5
 uv run python scrape_channel.py --allow-duplicates
 ```
 
+### Create a Pack from Spotify Playlist
+
+```bash
+uv run python create_pack_from_playlist.py <playlist_url_or_id> [pack_name]
+```
+
+**Examples:**
+
+```bash
+# Use playlist name as pack name
+uv run python create_pack_from_playlist.py https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+
+# Use custom pack name
+uv run python create_pack_from_playlist.py 37i9dQZF1DXcBWIGoYBM5M "My Custom Pack"
+```
+
+**What it does:**
+1. Fetches all tracks from the Spotify playlist
+2. Gets track details (title, artist, Spotify ID, etc.)
+3. Creates a pack in the database
+4. Adds all tracks to the pack
+
+**Note:** This is the easiest way to create packs since Spotify playlists are already curated and all tracks have Spotify IDs.
+
 ### Create a Pack from Single YouTube Video
 
 ```bash
@@ -146,9 +170,11 @@ scripts/
 ├── pyproject.toml                     # UV dependencies
 ├── .env.example                       # Environment variables template
 ├── .env                               # Your credentials (git-ignored)
-├── scrape_channel.py                  # ⭐ NEW: Scrape all videos from Track Star channel
-├── list_channel_videos.py             # ⭐ NEW: List all videos from channel
+├── scrape_channel.py                  # Scrape all videos from Track Star channel
+├── list_channel_videos.py             # List all videos from channel
+├── create_pack_from_playlist.py       # ⭐ NEW: Create pack from Spotify playlist
 ├── create_pack_from_youtube.py        # Create pack from single YouTube video
+├── create_pack_from_list.py           # Create pack from text file
 ├── list_packs.py                      # List all packs in database
 └── utils/
     ├── youtube.py                     # YouTube scraping utilities

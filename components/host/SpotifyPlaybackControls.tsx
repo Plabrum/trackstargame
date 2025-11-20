@@ -6,10 +6,10 @@
 
 import { useEffect, useState } from 'react';
 import { Play, Pause, Volume2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { SpotifyPlayerState } from '@/lib/audio/spotify-player';
 
 interface SpotifyPlaybackControlsProps {
@@ -65,9 +65,8 @@ export function SpotifyPlaybackControls({
     : 0;
 
   return (
-    <Card className="w-full bg-card/50 backdrop-blur">
-      <CardContent className="p-4">
-        <div className="flex gap-4">
+    <div className="w-full">
+      <div className="flex gap-4">
           {/* Album Art */}
           {track.albumArt && !hideTrackDetails && (
             <div className="flex-shrink-0">
@@ -121,25 +120,38 @@ export function SpotifyPlaybackControls({
 
               {/* Volume Control */}
               {onVolumeChange && (
-                <div className="flex items-center gap-2 w-24">
-                  <Volume2 className="h-4 w-4 text-muted-foreground" />
-                  <Slider
-                    value={[volume]}
-                    onValueChange={(values) => {
-                      const newVolume = values[0];
-                      setVolume(newVolume);
-                      onVolumeChange(newVolume / 100);
-                    }}
-                    max={100}
-                    step={1}
-                    className="flex-1"
-                  />
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-10 w-10"
+                    >
+                      <Volume2 className="h-5 w-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-16 p-3" side="top" align="center">
+                    <div className="flex flex-col items-center gap-3">
+                      <span className="text-xs text-muted-foreground font-medium">{volume}%</span>
+                      <Slider
+                        value={[volume]}
+                        onValueChange={(values) => {
+                          const newVolume = values[0];
+                          setVolume(newVolume);
+                          onVolumeChange(newVolume / 100);
+                        }}
+                        max={100}
+                        step={1}
+                        orientation="vertical"
+                        className="h-28"
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

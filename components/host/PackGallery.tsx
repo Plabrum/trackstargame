@@ -124,7 +124,7 @@ export function PackGallery() {
           <div className="space-y-2">
             <p className="font-semibold">No music packs available yet.</p>
             <p className="text-sm">
-              Create packs using the Python scripts in the <code className="bg-slate-100 px-1 rounded">scripts/</code> directory.
+              Create packs using the Python scripts in the <code className="bg-card border border-border px-1 rounded">scripts/</code> directory.
             </p>
           </div>
         </AlertDescription>

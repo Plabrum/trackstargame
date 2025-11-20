@@ -24,7 +24,8 @@ BEGIN
   -- Count players
   SELECT COUNT(*) INTO v_player_count FROM players WHERE session_id = p_session_id;
 
-  IF v_player_count < 2 AND NOT v_session.allow_single_user THEN
+  -- If host can play, min = 0 (host can play solo), otherwise min = 2
+  IF v_player_count < 2 AND NOT v_session.allow_host_to_play THEN
     RAISE EXCEPTION 'Need at least 2 players to start';
   END IF;
 
@@ -215,8 +216,8 @@ BEGIN
   SELECT COUNT(*) INTO v_submitted_count FROM round_answers WHERE round_id = v_round.id;
   v_all_submitted := (v_submitted_count = v_total_players);
 
-  -- Auto-finalize in single player mode
-  IF v_session.allow_single_user AND v_all_submitted AND p_auto_validated THEN
+  -- Auto-finalize in single player mode (1 player = solo play)
+  IF v_total_players = 1 AND v_all_submitted AND p_auto_validated THEN
     UPDATE players SET score = score + p_points_awarded WHERE id = p_player_id;
     UPDATE game_rounds SET correct = TRUE, points_awarded = p_points_awarded WHERE id = v_round.id;
     UPDATE game_sessions SET state = 'reveal' WHERE id = p_session_id;

@@ -29,7 +29,6 @@ export type PlayerAction =
 // Game settings (matches database schema)
 export type GameSettings = {
   allow_host_to_play?: boolean;
-  allow_single_user?: boolean;
   enable_text_input_mode?: boolean;
   total_rounds?: number;
 };
@@ -53,7 +52,6 @@ export type GameContext = {
   totalRounds: number;
 
   // Settings
-  allowSingleUser: boolean;
   allowHostToPlay: boolean;
   enableTextInputMode: boolean;
 
@@ -236,7 +234,8 @@ export function getAvailableActions(
     switch (state) {
       case 'lobby':
         // Start game action
-        const minPlayers = context.allowSingleUser ? 0 : (context.allowHostToPlay ? 1 : GAME_CONFIG.MIN_PLAYERS);
+        // If host can play, min = 0 (host can play solo), otherwise min = 2
+        const minPlayers = context.allowHostToPlay ? 0 : GAME_CONFIG.MIN_PLAYERS;
         const canStart = context.playerCount >= minPlayers && context.playerCount <= GAME_CONFIG.MAX_PLAYERS;
 
         actions.push({

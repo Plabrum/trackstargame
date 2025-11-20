@@ -20,6 +20,8 @@ export interface SpotifyUser {
 export interface SpotifyAuthState {
   /** Current authenticated user (always non-null within this context) */
   user: SpotifyUser;
+  /** Spotify access token for API calls and Web Playback SDK */
+  accessToken: string;
   /** Log out and clear auth */
   logout: () => Promise<void>;
 }
@@ -29,6 +31,8 @@ const SpotifyAuthContext = createContext<SpotifyAuthState | null>(null);
 export interface SpotifyAuthProviderProps {
   /** Authenticated user data from server (must be non-null) */
   user: SpotifyUser;
+  /** Spotify access token for API calls and Web Playback SDK */
+  accessToken: string;
   /** Child components */
   children: React.ReactNode;
 }
@@ -59,6 +63,7 @@ export interface SpotifyAuthProviderProps {
  */
 export function SpotifyAuthProvider({
   user,
+  accessToken,
   children,
 }: SpotifyAuthProviderProps) {
   /**
@@ -88,6 +93,7 @@ export function SpotifyAuthProvider({
 
   const value: SpotifyAuthState = {
     user,
+    accessToken,
     logout,
   };
 

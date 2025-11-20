@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Settings, User, Users, KeyboardIcon } from "lucide-react";
 import { useUpdateSettings } from "@/hooks/mutations/use-game-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +49,9 @@ export function GameSettingsForm({
   const { toast } = useToast();
   const updateSettings = useUpdateSettings();
 
+  // Settings panel state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   // Use controlled values if provided, otherwise use local state
   const [localTotalRounds, setLocalTotalRounds] = useState(session.total_rounds.toString());
   const totalRoundsStr = controlledTotalRounds !== undefined ? controlledTotalRounds.toString() : localTotalRounds;
@@ -61,7 +64,8 @@ export function GameSettingsForm({
   };
 
   // Determine initial game mode from session settings
-  const initialGameMode = session.allow_single_user ? 'solo' : 'party';
+  // Solo mode = host plays + text input enabled
+  const initialGameMode = session.allow_host_to_play && session.enable_text_input_mode ? 'solo' : 'party';
   const [localGameMode, setLocalGameMode] = useState<'solo' | 'party'>(initialGameMode);
   const gameMode = controlledGameMode !== undefined ? controlledGameMode : localGameMode;
   const handleGameModeChange = (value: 'solo' | 'party') => {
@@ -97,26 +101,22 @@ export function GameSettingsForm({
     try {
       // Derive backend settings from game mode
       let allowHostToPlay: boolean;
-      let allowSingleUser: boolean;
       let enableTextInputMode: boolean;
 
       if (gameMode === 'solo') {
         // Solo mode: all preset
         enableTextInputMode = true;
         allowHostToPlay = true;
-        allowSingleUser = true;
       } else {
         // Party mode: use toggles
         enableTextInputMode = partyTextInput;
         // Host can only play if text input is enabled
         allowHostToPlay = partyTextInput && partyHostPlays;
-        allowSingleUser = false;
       }
 
       await updateSettings.mutateAsync({
         sessionId: session.id,
         allowHostToPlay,
-        allowSingleUser,
         enableTextInputMode,
         totalRounds: parseInt(totalRoundsStr),
       });
@@ -143,71 +143,57 @@ export function GameSettingsForm({
 
   const formContent = (
     <div className="space-y-6">
-      {/* Number of Rounds */}
+      {/* Game Mode Tabs with Settings Cog */}
       <div className="space-y-2">
-        <Label htmlFor="rounds" className="text-base font-semibold">
-          Number of Rounds
-        </Label>
-            <Select value={totalRoundsStr} onValueChange={handleTotalRoundsChange}>
-              <SelectTrigger id="rounds" className="w-full">
-                <SelectValue placeholder="Select number of rounds" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5 Rounds</SelectItem>
-                <SelectItem value="10">10 Rounds</SelectItem>
-                <SelectItem value="15">15 Rounds</SelectItem>
-                <SelectItem value="20">20 Rounds</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose how many rounds you want to play
-            </p>
-          </div>
+        <div className="flex items-center justify-between">
+          <Label className="text-base font-semibold">Game Mode</Label>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className="h-8 w-8"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
 
-          {/* Game Mode Tabs */}
-          <div className="space-y-2">
-            <Label className="text-base font-semibold">Game Mode</Label>
-            <Tabs value={gameMode} onValueChange={(value: string) => handleGameModeChange(value as 'solo' | 'party')}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="solo" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Solo Mode
-                </TabsTrigger>
-                <TabsTrigger value="party" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Party Mode
-                </TabsTrigger>
-              </TabsList>
+        <Tabs value={gameMode} onValueChange={(value: string) => handleGameModeChange(value as 'solo' | 'party')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="solo" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Solo Mode
+            </TabsTrigger>
+            <TabsTrigger value="party" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Party Mode
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-              {/* Solo Mode Tab */}
-              <TabsContent value="solo" className="space-y-4 mt-4">
-                <Alert>
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <p className="font-semibold">Practice alone with text input!</p>
-                      <p className="text-sm">
-                        You&apos;ll be automatically added as a player. Type in artist names, get instant feedback, and improve your music knowledge solo.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        <p>✓ Text input enabled</p>
-                        <p>✓ You play as a participant</p>
-                        <p>✓ Can start with 0 other players</p>
-                      </div>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
+        {/* Collapsible Settings */}
+        <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <CollapsibleContent className="space-y-4 mt-4">
+            {/* Number of Rounds */}
+            <div className="space-y-2">
+              <Label htmlFor="rounds" className="text-base font-semibold">
+                Number of Rounds
+              </Label>
+              <Select value={totalRoundsStr} onValueChange={handleTotalRoundsChange}>
+                <SelectTrigger id="rounds" className="w-full">
+                  <SelectValue placeholder="Select number of rounds" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 Rounds</SelectItem>
+                  <SelectItem value="10">10 Rounds</SelectItem>
+                  <SelectItem value="15">15 Rounds</SelectItem>
+                  <SelectItem value="20">20 Rounds</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              {/* Party Mode Tab */}
-              <TabsContent value="party" className="space-y-4 mt-4">
-                <Alert>
-                  <AlertDescription>
-                    <p className="text-sm">
-                      Play with friends! Choose buzz or text input mode, and optionally join as a player yourself.
-                    </p>
-                  </AlertDescription>
-                </Alert>
-
+            {/* Party Mode Settings */}
+            {gameMode === 'party' && (
+              <>
                 {/* Enable Text Input Mode */}
                 <div className="flex items-start justify-between space-x-4 rounded-lg border p-4">
                   <div className="flex-1 space-y-1">
@@ -233,9 +219,8 @@ export function GameSettingsForm({
                 </div>
 
                 {/* Allow Host to Play (only when text input is enabled) */}
-                <div className={`flex items-start justify-between space-x-4 rounded-lg border p-4 ${
-                  !partyTextInput ? 'opacity-50' : ''
-                }`}>
+                <div className={`flex items-start justify-between space-x-4 rounded-lg border p-4 ${!partyTextInput ? 'opacity-50' : ''
+                  }`}>
                   <div className="flex-1 space-y-1">
                     <Label htmlFor="party-host-play" className="text-base font-semibold flex items-center gap-2">
                       <User className="h-4 w-4" />
@@ -255,9 +240,11 @@ export function GameSettingsForm({
                     disabled={!partyTextInput}
                   />
                 </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+              </>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
     </div>
   );
 

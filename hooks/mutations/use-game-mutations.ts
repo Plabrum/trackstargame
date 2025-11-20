@@ -385,7 +385,6 @@ export function useUpdateSettings() {
     mutationFn: async (params: {
       sessionId: string;
       allowHostToPlay: boolean;
-      allowSingleUser: boolean;
       enableTextInputMode: boolean;
       totalRounds: number;
     }) => {
@@ -393,7 +392,6 @@ export function useUpdateSettings() {
         .from('game_sessions')
         .update({
           allow_host_to_play: params.allowHostToPlay,
-          allow_single_user: params.allowSingleUser,
           enable_text_input_mode: params.enableTextInputMode,
           total_rounds: params.totalRounds,
         })
