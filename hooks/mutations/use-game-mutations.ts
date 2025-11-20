@@ -90,9 +90,12 @@ export function useStartGame() {
       if (error) throw error;
       return data as RPCFunction<'start_game'>;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions', data.id] });
-      queryClient.invalidateQueries({ queryKey: ['sessions', data.id, 'rounds'] });
+    onSuccess: async (data) => {
+      // Invalidate and refetch queries to ensure data is up-to-date before resolving
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['sessions', data.id] }),
+        queryClient.invalidateQueries({ queryKey: ['sessions', data.id, 'rounds'] }),
+      ]);
     },
     onError: (error: Error) => {
       throw new Error(translateDBError(error));
@@ -159,6 +162,9 @@ export function useBuzz() {
     },
 
     onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['sessions', variables.sessionId],
+      });
       queryClient.invalidateQueries({
         queryKey: ['sessions', variables.sessionId, 'rounds'],
       });

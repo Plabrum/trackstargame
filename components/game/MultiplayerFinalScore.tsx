@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Trophy, Medal, Award } from "lucide-react";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { Header } from "@/components/shared/Header";
+import { UserInfo } from "@/components/shared/UserInfo";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -16,9 +17,10 @@ interface MultiplayerFinalScoreProps {
   rounds: GameRound[];
   onPlayAgain: () => void;
   currentPlayerId?: string | null;
+  showUserInfo?: boolean;
 }
 
-export function MultiplayerFinalScore({ players, rounds, onPlayAgain, currentPlayerId }: MultiplayerFinalScoreProps) {
+export function MultiplayerFinalScore({ players, rounds, onPlayAgain, currentPlayerId, showUserInfo = false }: MultiplayerFinalScoreProps) {
   // Sort players by score
   const sortedPlayers = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const winner = sortedPlayers[0];
@@ -27,7 +29,7 @@ export function MultiplayerFinalScore({ players, rounds, onPlayAgain, currentPla
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <Header title="Game Over!" showUserInfo />
+      <Header title="Game Over!" rightContent={showUserInfo ? <UserInfo /> : undefined} />
 
       {/* Winner Podium */}
       <Card className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-orange-50">

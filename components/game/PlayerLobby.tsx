@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { PlayerList } from "@/components/shared/PlayerList";
+import { Header } from "@/components/shared/Header";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -43,8 +44,10 @@ export function PlayerLobby({
   return (
     <div className="container mx-auto p-6 max-w-2xl space-y-6">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold">Join Game</h1>
+      <Header title="Join Game" />
+
+      {/* Game Info */}
+      <div className="flex items-center justify-center gap-4">
         <p className="text-muted-foreground">Hosted by {hostName}</p>
         <Badge variant="outline" className="text-sm">
           Game Code: {sessionId.slice(0, 8).toUpperCase()}

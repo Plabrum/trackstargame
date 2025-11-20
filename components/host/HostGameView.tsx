@@ -20,6 +20,7 @@ import { HostActionsPanel } from "./HostActionsPanel";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
 import { Header } from "@/components/shared/Header";
+import { UserInfo } from "@/components/shared/UserInfo";
 import { TrackReveal } from "@/components/game/TrackReveal";
 import type { Tables } from "@/lib/types/database";
 import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
@@ -227,7 +228,10 @@ export function HostGameView({
         />
 
         {/* Header */}
-        <Header title={`Round ${currentRoundNum} / ${totalRounds}`} showUserInfo />
+        <Header
+          title={`Round ${currentRoundNum} / ${totalRounds}`}
+          rightContent={<UserInfo />}
+        />
 
 
         <div className="grid md:grid-cols-3 gap-6">

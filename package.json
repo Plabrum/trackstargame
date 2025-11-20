@@ -36,6 +36,7 @@
     "framer-motion": "^12.23.24",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.468.0",
+    "luxon": "^3.7.2",
     "next": "^15.0.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
@@ -45,6 +46,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.1",
     "@types/node": "^20",
     "@types/qrcode.react": "^3.0.0",
     "@types/react": "^19",

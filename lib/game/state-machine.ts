@@ -114,11 +114,11 @@ export function calculatePoints(elapsedSeconds: number, correct: boolean): numbe
   }
 
   // Correct answer: MAX_POINTS_PER_ROUND - elapsed_seconds
-  // Example: buzzed at 3.5s = 26.5 points
+  // Example: buzzed at 3.5s = 27 points (rounded)
   const points = GAME_CONFIG.MAX_POINTS_PER_ROUND - elapsedSeconds;
 
   // Minimum MIN_POINTS_FOR_CORRECT for correct answers (even if slow)
-  return Math.max(GAME_CONFIG.MIN_POINTS_FOR_CORRECT, Math.round(points * 10) / 10);
+  return Math.max(GAME_CONFIG.MIN_POINTS_FOR_CORRECT, Math.round(points));
 }
 
 /**
@@ -384,18 +384,7 @@ export function getAvailableActions(
         break;
 
       case 'playing':
-        // Buzz action
-        const alreadyBuzzed = context.hasPlayerBuzzed ?? false;
-        actions.push({
-          action: { type: 'buzz' },
-          label: 'Buzz In',
-          description: 'Signal that you know the answer',
-          enabled: !alreadyBuzzed,
-          disabledReason: alreadyBuzzed ? 'Someone already buzzed' : undefined,
-          variant: 'primary',
-        });
-
-        // Submit answer (if text input mode enabled)
+        // Text input mode: submit answer instead of buzzing
         if (context.enableTextInputMode) {
           const hasSubmitted = context.hasCurrentPlayerSubmitted ?? false;
           actions.push({
@@ -404,6 +393,17 @@ export function getAvailableActions(
             description: 'Type your answer',
             enabled: !hasSubmitted,
             disabledReason: hasSubmitted ? 'You already submitted' : undefined,
+            variant: 'primary',
+          });
+        } else {
+          // Buzz mode: buzz in to answer
+          const alreadyBuzzed = context.hasPlayerBuzzed ?? false;
+          actions.push({
+            action: { type: 'buzz' },
+            label: 'Buzz In',
+            description: 'Signal that you know the answer',
+            enabled: !alreadyBuzzed,
+            disabledReason: alreadyBuzzed ? 'Someone already buzzed' : undefined,
             variant: 'primary',
           });
         }

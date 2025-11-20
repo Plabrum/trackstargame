@@ -2,12 +2,12 @@
 
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
+import { useGameSession, useGamePlayers, useGameRounds, useRoundAnswers } from "@/hooks/queries/use-game";
 import { useHost } from "@/hooks/useHost";
-import { useSubmitAnswer } from "@/hooks/mutations/use-game-mutations";
+import { useSubmitAnswer, useFinalizeJudgments } from "@/hooks/mutations/use-game-mutations";
 import { HostLobby } from "@/components/host/HostLobby";
 import { HostGameController } from "@/components/host/HostGameController";
-import { FinalScore } from "@/components/game/FinalScore";
+import { HostFinalScore } from "@/components/game/HostFinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
@@ -49,6 +49,9 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   const { data: session, isLoading: isLoadingSession, error: sessionError } = useGameSession(id);
   const { data: players = [], isLoading: isLoadingPlayers } = useGamePlayers(id);
   const { data: rounds = [] } = useGameRounds(id);
+
+  // Fetch submitted answers for current round (for text input mode)
+  const { data: submittedAnswers = [] } = useRoundAnswers(id, session?.current_round ?? null);
 
   // Get current round data (needed for track query)
   const currentRound = session ? rounds.find((r) => r.round_number === session.current_round) : null;
@@ -105,6 +108,9 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     correctAnswer: string;
     pointsEarned: number;
   } | null>(null);
+
+  // Finalize judgments mutation (for party mode with text input)
+  const finalizeJudgments = useFinalizeJudgments();
 
   // Reset answer feedback and mutation state when round changes
   useEffect(() => {
@@ -214,7 +220,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
   // Render appropriate view based on game state
   if (session.state === 'finished') {
     return (
-      <FinalScore
+      <HostFinalScore
         players={players}
         rounds={rounds}
         onPlayAgain={() => router.push("/host")}
@@ -263,6 +269,22 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       isSubmittingAnswer={submitAnswer.isPending}
       hasSubmittedAnswer={submitAnswer.isSuccess}
       answerFeedback={answerFeedback}
+      submittedAnswers={submittedAnswers}
+      onFinalizeJudgment={(overrides) => {
+        finalizeJudgments.mutate(
+          { sessionId: id, overrides },
+          {
+            onError: (error) => {
+              toast({
+                title: "Failed to finalize judgments",
+                description: error.message,
+                variant: "destructive",
+              });
+            },
+          }
+        );
+      }}
+      isFinalizing={finalizeJudgments.isPending}
     />
   );
 }

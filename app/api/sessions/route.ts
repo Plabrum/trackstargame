@@ -51,8 +51,8 @@ export async function POST(request: Request) {
     const {
       packId,
       totalRounds = 10,
-      allowHostToPlay = true,
-      enableTextInputMode = true,
+      allowHostToPlay = false,
+      enableTextInputMode = false,
     } = body;
 
     if (!packId) {

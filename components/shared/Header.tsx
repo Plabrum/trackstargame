@@ -1,30 +1,20 @@
 /**
  * Header Component
  *
- * Reusable header with logo and optional user info/logout
+ * Reusable header with logo and optional right-side content
  */
 
 'use client';
 
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { User, LogOut } from "lucide-react";
-import { useSpotifyAuth } from "@/lib/spotify-auth-context";
+import type { ReactNode } from "react";
 
 interface HeaderProps {
   title: string;
-  showUserInfo?: boolean;
+  rightContent?: ReactNode;
 }
 
-export function Header({ title, showUserInfo = false }: HeaderProps) {
-  const { user, logout } = useSpotifyAuth();
-
-  async function handleLogout() {
-    await logout();
-  }
-
-  const displayName = user?.display_name || user?.email || 'User';
-
+export function Header({ title, rightContent }: HeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -40,20 +30,9 @@ export function Header({ title, showUserInfo = false }: HeaderProps) {
         </h1>
       </div>
 
-      {showUserInfo && user && (
+      {rightContent && (
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-lg border shadow-sm">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-white">{displayName}</span>
-          </div>
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+          {rightContent}
         </div>
       )}
     </div>

@@ -221,6 +221,74 @@ export function useTrack(trackId: string | null) {
 }
 
 /**
+ * Fetch round answers with real-time updates.
+ *
+ * Uses direct Supabase query
+ */
+export function useRoundAnswers(sessionId: string | null, roundNumber: number | null) {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  const query = useQuery({
+    queryKey: ['sessions', sessionId, 'rounds', roundNumber, 'answers'],
+    queryFn: async () => {
+      if (!sessionId || !roundNumber) return [];
+
+      // First get the round
+      const { data: round, error: roundError } = await supabase
+        .from('game_rounds')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('round_number', roundNumber)
+        .single();
+
+      if (roundError || !round) return [];
+
+      // Then get answers for that round
+      const { data, error } = await supabase
+        .from('round_answers')
+        .select('*')
+        .eq('round_id', round.id)
+        .order('submitted_at', { ascending: true });
+
+      if (error) throw error;
+      return data as TableRow<'round_answers'>[];
+    },
+    enabled: !!sessionId && !!roundNumber,
+    staleTime: 0, // Always consider data stale for immediate updates
+  });
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!sessionId || !roundNumber) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`round-answers:${sessionId}:${roundNumber}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'round_answers',
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ['sessions', sessionId, 'rounds', roundNumber, 'answers'],
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [sessionId, roundNumber, queryClient]);
+
+  return query;
+}
+
+/**
  * Fetch album art from Spotify API using a track's Spotify ID.
  *
  * Requires Spotify access token.

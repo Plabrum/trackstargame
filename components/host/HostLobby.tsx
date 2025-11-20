@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { GameSettingsForm } from "@/components/host/GameSettingsForm";
 import { PlayerList } from "@/components/shared/PlayerList";
 import { Header } from "@/components/shared/Header";
+import { UserInfo } from "@/components/shared/UserInfo";
+import { useUpdateSettings } from "@/hooks/mutations/use-game-mutations";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -43,6 +45,9 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   const [gameMode, setGameMode] = useState<'solo' | 'party'>(initialGameMode);
   const [partyTextInput, setPartyTextInput] = useState(session.enable_text_input_mode ?? false);
   const [partyHostPlays, setPartyHostPlays] = useState(session.allow_host_to_play);
+
+  // Mutation for updating settings
+  const updateSettings = useUpdateSettings();
 
   // Determine min/max players based on current settings
   const maxPlayers = 10;
@@ -76,7 +81,7 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <Header title="Game Lobby" showUserInfo />
+      <Header title="Game Lobby" rightContent={<UserInfo />} />
 
       {/* Game Mode & Settings - Always Visible */}
       <GameSettingsForm
@@ -196,20 +201,33 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
 
       <div className="flex justify-center">
         <Button
-          onClick={() => {
+          onClick={async () => {
             // Derive settings from current state
             const enableTextInputMode = gameMode === 'solo' || partyTextInput;
-            const settings = {
-              totalRounds,
-              allowHostToPlay,
-              enableTextInputMode,
-            };
-            onStartGame(settings);
+
+            try {
+              // First, update settings in the database
+              await updateSettings.mutateAsync({
+                sessionId,
+                totalRounds,
+                allowHostToPlay,
+                enableTextInputMode,
+              });
+
+              // Then start the game
+              onStartGame();
+            } catch (error) {
+              toast({
+                title: "Error",
+                description: error instanceof Error ? error.message : "Failed to start game",
+                variant: "destructive",
+              });
+            }
           }}
-          disabled={!canStart || isStarting}
+          disabled={!canStart || isStarting || updateSettings.isPending}
           className="px-12 py-3 text-lg font-bold bg-orange hover:bg-orange/90 text-white rounded-full"
         >
-          {isStarting ? "Starting Game..." : "Start Game"}
+          {isStarting || updateSettings.isPending ? "Starting Game..." : "Start Game"}
         </Button>
       </div>
 

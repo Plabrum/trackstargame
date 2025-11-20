@@ -17,6 +17,7 @@ import type { UseSpotifyPlayerReturn } from "@/hooks/useSpotifyPlayer";
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
 type GameRound = Tables<'game_rounds'>;
+type RoundAnswer = Tables<'round_answers'>;
 
 interface HostGameControllerProps {
   session: GameSession;
@@ -46,6 +47,10 @@ interface HostGameControllerProps {
     correctAnswer: string;
     pointsEarned: number;
   } | null;
+  // Text input mode
+  submittedAnswers?: RoundAnswer[];
+  onFinalizeJudgment?: (overrides?: Record<string, boolean>) => void;
+  isFinalizing?: boolean;
 }
 
 export function HostGameController(props: HostGameControllerProps) {
@@ -74,14 +79,15 @@ export function HostGameController(props: HostGameControllerProps) {
       isReady &&
       !hasStartedPlayingRef.current
     ) {
+      console.log('[HostGameController] Auto-playing track:', currentSpotifyId);
       play(currentSpotifyId)
         .then(() => {
+          console.log('[HostGameController] Track started playing successfully');
           hasStartedPlayingRef.current = true;
         })
         .catch((err) => {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('[HostGameController] Failed to auto-play:', err);
-          }
+          console.error('[HostGameController] Failed to auto-play:', err);
+          // Don't set hasStartedPlayingRef to true on failure, so we can retry
         });
     }
   }, [props.session.state, currentSpotifyId, isReady, play]);
@@ -150,6 +156,9 @@ export function HostGameController(props: HostGameControllerProps) {
           setVolume(volume);
         }}
         isSpotifyReady={isReady}
+        submittedAnswers={props.submittedAnswers}
+        onFinalizeJudgment={props.onFinalizeJudgment}
+        isFinalizing={props.isFinalizing}
       />
     </div>
   );

@@ -8,7 +8,7 @@ import { useJoinSession, useSubmitAnswer } from "@/hooks/mutations/use-game-muta
 import { usePlayer } from "@/hooks/usePlayer";
 import { PlayerLobby } from "@/components/game/PlayerLobby";
 import { PlayerGameView } from "@/components/game/PlayerGameView";
-import { FinalScore } from "@/components/game/FinalScore";
+import { PlayerFinalScore } from "@/components/game/PlayerFinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +59,11 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
 
       return data;
     },
-    enabled: !!currentRound?.track_id && !!session && (session.state === 'buzzed' || session.state === 'reveal'),
+    enabled: !!currentRound?.track_id && !!session && (
+      session.state === 'buzzed' ||
+      session.state === 'reveal' ||
+      (session.state === 'playing' && session.enable_text_input_mode)
+    ),
   });
 
   // Join session mutation
@@ -191,7 +195,7 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
   // Render appropriate view based on game state
   if (session.state === 'finished') {
     return (
-      <FinalScore
+      <PlayerFinalScore
         players={players}
         rounds={rounds}
         currentPlayerId={playerId}

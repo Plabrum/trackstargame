@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Header } from "@/components/shared/Header";
+import { UserInfo } from "@/components/shared/UserInfo";
 import { SoloGameStats } from "./SoloGameStats";
 import { ShareButton } from "./ShareButton";
 import { ShareableScoreCard } from "./ShareableScoreCard";
@@ -30,7 +31,7 @@ export function SoloFinalScore({ player, rounds, onPlayAgain, albumArtUrl }: Sol
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <Header title="Game Over!" showUserInfo />
+      <Header title="Game Over!" rightContent={<UserInfo />} />
 
       {/* Regular Stats Display */}
       <SoloGameStats rounds={rounds} finalScore={player.score ?? 0} />

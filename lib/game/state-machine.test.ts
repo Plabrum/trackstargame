@@ -26,7 +26,6 @@ const createContext = (overrides: Partial<GameContext> = {}): GameContext => ({
   state: 'lobby',
   currentRound: 1,
   totalRounds: 10,
-  allowSingleUser: false,
   allowHostToPlay: false,
   enableTextInputMode: false,
   playerCount: 2,
@@ -60,7 +59,7 @@ describe('getAvailableActions', () => {
     it('should allow start game with 0 players in solo mode', () => {
       const context = createContext({
         playerCount: 0,
-        allowSingleUser: true,
+        allowHostToPlay: true,
       });
       const actions = getAvailableActions('lobby', 'host', context);
 
@@ -432,7 +431,6 @@ describe('getAvailableActions', () => {
         state: 'playing',
         currentRound: 1,
         totalRounds: 10,
-        allowSingleUser: false,
         allowHostToPlay: false,
         enableTextInputMode: false,
         playerCount: 2,

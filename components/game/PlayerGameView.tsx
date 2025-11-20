@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music } from "lucide-react";
@@ -16,6 +16,9 @@ import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
 import { PlayerActionsPanel } from "./PlayerActionsPanel";
 import { Leaderboard } from "@/components/shared/Leaderboard";
+import { RoundTimer } from "./RoundTimer";
+import { TrackReveal } from "./TrackReveal";
+import { Header } from "@/components/shared/Header";
 import type { Tables } from "@/lib/types/database";
 
 type RoundJudgment = {
@@ -113,16 +116,14 @@ export function PlayerGameView({
         // Show feedback for single player mode
         if (answerFeedback) {
           return (
-            <Alert className={`border-2 ${
-              answerFeedback.isCorrect
-                ? 'border-green-500 bg-green-50'
-                : 'border-red-500 bg-red-50'
-            }`}>
+            <Alert className={`border-2 ${answerFeedback.isCorrect
+              ? 'border-green-500 bg-green-50'
+              : 'border-red-500 bg-red-50'
+              }`}>
               <AlertDescription>
                 <div className="text-center py-6">
-                  <p className={`text-4xl font-bold mb-2 ${
-                    answerFeedback.isCorrect ? 'text-green-900' : 'text-red-900'
-                  }`}>
+                  <p className={`text-4xl font-bold mb-2 ${answerFeedback.isCorrect ? 'text-green-900' : 'text-red-900'
+                    }`}>
                     {answerFeedback.isCorrect ? '✓ CORRECT!' : '✗ INCORRECT'}
                   </p>
                   {!answerFeedback.isCorrect && (
@@ -130,9 +131,8 @@ export function PlayerGameView({
                       It was: {answerFeedback.correctAnswer}
                     </p>
                   )}
-                  <p className={`text-2xl font-semibold ${
-                    answerFeedback.isCorrect ? 'text-green-700' : 'text-red-700'
-                  }`}>
+                  <p className={`text-2xl font-semibold ${answerFeedback.isCorrect ? 'text-green-700' : 'text-red-700'
+                    }`}>
                     {answerFeedback.pointsEarned > 0 ? '+' : ''}{answerFeedback.pointsEarned} points
                   </p>
                 </div>
@@ -141,16 +141,10 @@ export function PlayerGameView({
           );
         }
 
-        // Default playing state message
+        // Default playing state message - show timer for both modes
         return (
-          <div className="text-center mb-4">
-            <Music className="h-12 w-12 mx-auto text-orange animate-pulse" />
-            <p className="text-lg font-semibold mt-2">Listening...</p>
-            <p className="text-sm text-muted-foreground">
-              {isTextInputMode
-                ? "Type the artist/band name when you know it!"
-                : "Buzz when you know the song!"}
-            </p>
+          <div className="space-y-4">
+            <RoundTimer startedAt={session.round_start_time ?? null} maxSeconds={30} />
           </div>
         );
 
@@ -197,38 +191,32 @@ export function PlayerGameView({
         );
 
       case 'reveal':
+        // Determine feedback to show in TrackReveal
+        let feedbackForReveal = undefined;
+
+        // For single player mode, use answerFeedback
+        if (answerFeedback && isSinglePlayer) {
+          feedbackForReveal = {
+            isCorrect: answerFeedback.isCorrect,
+            pointsEarned: answerFeedback.pointsEarned,
+          };
+        }
+        // For multiplayer with judgment, use roundJudgment if it's for current player
+        else if (roundJudgment && roundJudgment.playerId === currentPlayerId) {
+          feedbackForReveal = {
+            isCorrect: roundJudgment.correct,
+            pointsEarned: roundJudgment.pointsAwarded,
+          };
+        }
+
         return (
           <div className="space-y-4">
-            {/* Judgment Feedback - Show if this player was judged */}
-            {roundJudgment && roundJudgment.playerId === currentPlayerId && (
-              <Alert className={`border-2 ${
-                roundJudgment.correct
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-red-500 bg-red-50'
-              }`}>
-                <AlertDescription>
-                  <div className="text-center py-6">
-                    <p className={`text-4xl font-bold mb-2 ${
-                      roundJudgment.correct ? 'text-green-900' : 'text-red-900'
-                    }`}>
-                      {roundJudgment.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
-                    </p>
-                    <p className={`text-2xl font-semibold ${
-                      roundJudgment.correct ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {roundJudgment.pointsAwarded > 0 ? '+' : ''}{roundJudgment.pointsAwarded} points
-                    </p>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
             {currentTrack && (
-              <div className="text-center p-6 bg-orange/10 rounded-lg border border-orange/20">
-                <p className="text-sm text-muted-foreground mb-2">Song Revealed</p>
-                <p className="text-2xl font-bold">{currentTrack.title}</p>
-                <p className="text-xl text-muted-foreground">{currentTrack.artist}</p>
-              </div>
+              <TrackReveal
+                trackTitle={currentTrack.title}
+                artistName={currentTrack.artist}
+                answerFeedback={feedbackForReveal}
+              />
             )}
 
             {buzzerPlayer && (
@@ -262,16 +250,16 @@ export function PlayerGameView({
       />
 
       {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">Round {currentRoundNum} / {totalRounds}</h1>
-        <div className="flex items-center justify-center gap-4">
-          <Badge variant="outline">
-            Your Score: <AnimatedScore score={currentPlayer?.score ?? 0} />
-          </Badge>
-          <Badge variant="secondary">
-            Rank: #{currentPlayerRank}
-          </Badge>
-        </div>
+      <Header title={`Round ${currentRoundNum} / ${totalRounds}`} />
+
+      {/* Player Stats */}
+      <div className="flex items-center justify-center gap-4">
+        <Badge variant="outline">
+          Your Score: <AnimatedScore score={currentPlayer?.score ?? 0} />
+        </Badge>
+        <Badge variant="secondary">
+          Rank: #{currentPlayerRank}
+        </Badge>
       </div>
 
       {/* Main Game Area */}
