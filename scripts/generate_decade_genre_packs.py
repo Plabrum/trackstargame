@@ -26,8 +26,11 @@ if not os.getenv('DATABASE_URL'):
     supabase_url = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
 
     if db_password and supabase_url:
+        # Extract project ref from Supabase URL
+        # Format: https://[project-ref].supabase.co
         project_ref = supabase_url.replace('https://', '').split('.')[0]
-        database_url = f"postgresql://postgres.{project_ref}:{db_password}@aws-0-us-east-2.pooler.supabase.com:6543/postgres"
+        # Try IPv6 direct connection
+        database_url = f"postgresql://postgres:{db_password}@db.{project_ref}.supabase.co:6543/postgres"
         os.environ['DATABASE_URL'] = database_url
 
 

@@ -133,6 +133,8 @@ def enrich_pack_tracks(pack_id: str, pack_name: str, spotify_client: SpotifyClie
 
 def main():
     """Main entry point."""
+    import sys
+
     print("Track Metadata Enrichment Script")
     print("=" * 80)
 
@@ -150,19 +152,23 @@ def main():
         print("No packs found in database")
         return
 
-    # Display available packs
-    print("\nAvailable packs:")
-    for i, pack in enumerate(packs, 1):
-        tags_str = f" [{', '.join(pack['tags'])}]" if pack['tags'] else ""
-        print(f"  {i}. {pack['name']}{tags_str} ({pack['track_count']} tracks)")
+    # Check for command-line argument
+    if len(sys.argv) > 1:
+        choice = sys.argv[1].strip().lower()
+    else:
+        # Display available packs
+        print("\nAvailable packs:")
+        for i, pack in enumerate(packs, 1):
+            tags_str = f" [{', '.join(pack['tags'])}]" if pack['tags'] else ""
+            print(f"  {i}. {pack['name']}{tags_str} ({pack['track_count']} tracks)")
 
-    # Ask user which pack to enrich
-    print("\nOptions:")
-    print("  - Enter pack number to enrich a specific pack")
-    print("  - Enter 'all' to enrich all packs")
-    print("  - Enter 'quit' to exit")
+        # Ask user which pack to enrich
+        print("\nOptions:")
+        print("  - Enter pack number to enrich a specific pack")
+        print("  - Enter 'all' to enrich all packs")
+        print("  - Enter 'quit' to exit")
 
-    choice = input("\nYour choice: ").strip().lower()
+        choice = input("\nYour choice: ").strip().lower()
 
     if choice == 'quit':
         print("Exiting...")
