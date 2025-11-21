@@ -197,7 +197,7 @@ def get_pack_tracks(pack_id: str) -> List[Dict]:
 
         cursor.execute(
             """
-            SELECT id, title, artist, spotify_id, release_year, album_name, primary_genre, created_at
+            SELECT id, title, artist, spotify_id, release_year, album_name, genres, created_at
             FROM tracks
             WHERE pack_id = %s
             ORDER BY created_at
@@ -214,7 +214,7 @@ def get_pack_tracks(pack_id: str) -> List[Dict]:
                 'spotify_id': row[3],
                 'release_year': row[4],
                 'album_name': row[5],
-                'primary_genre': row[6],
+                'genres': row[6],
                 'created_at': row[7]
             })
 

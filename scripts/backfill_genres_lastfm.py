@@ -10,7 +10,7 @@ import time
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
-from psycopg2.extras import Json
+import psycopg2.extensions
 from utils.db import get_db_connection
 
 # Load environment variables
@@ -99,7 +99,7 @@ def main():
         cursor.execute("""
             SELECT DISTINCT artist, COUNT(*) as track_count
             FROM tracks
-            WHERE pack_id = (SELECT id FROM packs WHERE name LIKE '%Every Track Star%' LIMIT 1)
+            WHERE pack_id = (SELECT id FROM packs WHERE name LIKE '%%Every Track Star%%' LIMIT 1)
               AND (genres IS NULL OR genres = '{}')
             GROUP BY artist
             ORDER BY track_count DESC
@@ -126,12 +126,12 @@ def main():
 
             if genres:
                 # Update all tracks by this artist
-                # Note: psycopg2 requires arrays to be passed with proper type casting
+                # Note: Using %% to escape % in LIKE clause
                 cursor.execute("""
                     UPDATE tracks
-                    SET genres = %s::text[]
+                    SET genres = %s
                     WHERE artist = %s
-                      AND pack_id = (SELECT id FROM packs WHERE name LIKE '%Every Track Star%' LIMIT 1)
+                      AND pack_id = (SELECT id FROM packs WHERE name LIKE '%%Every Track Star%%' LIMIT 1)
                       AND (genres IS NULL OR genres = '{}')
                 """, (genres, artist_name))
 

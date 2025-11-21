@@ -124,7 +124,10 @@ def main():
 
     for track in tracks:
         year = track.get('release_year')
-        genre = track.get('primary_genre')
+        genres = track.get('genres', [])
+
+        # Use first genre from array
+        genre = genres[0] if genres and len(genres) > 0 else None
 
         if year and genre:
             decade = get_decade(year)
