@@ -144,7 +144,7 @@ export function HostGameView({
   const renderStateInfo = () => {
     switch (state) {
       case 'playing':
-        if ((isSoloMode || (session.allow_host_to_play && hostPlayerId)) && session.enable_text_input_mode && hasSubmittedAnswer) {
+        if (hostPlayerId && session.enable_text_input_mode && hasSubmittedAnswer) {
           return (
             <Alert>
               <AlertDescription className="text-center py-4">
@@ -261,7 +261,7 @@ export function HostGameView({
 
                 {/* Host Text Input (Solo or Party Mode) */}
                 {state === 'playing' &&
-                  (isSoloMode || (session.allow_host_to_play && hostPlayerId)) &&
+                  hostPlayerId &&
                   session.enable_text_input_mode &&
                   !hasSubmittedAnswer &&
                   !answerFeedback &&
