@@ -39,6 +39,7 @@ export function useGameSession(sessionId: string | null) {
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
+    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -96,6 +97,7 @@ export function useGamePlayers(sessionId: string | null) {
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
     refetchOnMount: true, // Refetch when component mounts
+    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -154,6 +156,7 @@ export function useGameRounds(sessionId: string | null) {
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
+    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -256,6 +259,7 @@ export function useRoundAnswers(sessionId: string | null, roundNumber: number | 
     },
     enabled: !!sessionId && !!roundNumber,
     staleTime: 0, // Always consider data stale for immediate updates
+    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates

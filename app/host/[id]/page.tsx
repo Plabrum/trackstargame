@@ -96,7 +96,7 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
     isEndingGame,
   } = useHost(id);
 
-  // Find host player (for solo mode)
+  // Find host player (auto-created by start_game when allow_host_to_play is enabled)
   const hostPlayer = players.find((p) => p.is_host);
 
   // Submit answer mutation (text input mode for solo mode)
@@ -179,6 +179,18 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       }
     );
   };
+
+  // Debug logging
+  if (session) {
+    console.log('Host page - Session data:', {
+      state: session.state,
+      allow_host_to_play: session.allow_host_to_play,
+      enable_text_input_mode: session.enable_text_input_mode,
+      total_rounds: session.total_rounds,
+      current_round: session.current_round,
+    });
+    console.log('Host page - Host player:', hostPlayer);
+  }
 
   // Loading state
   if (isLoadingSession || isLoadingPlayers) {

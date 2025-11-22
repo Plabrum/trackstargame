@@ -202,18 +202,30 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
             // Derive settings from current state
             const enableTextInputMode = gameMode === 'solo' || partyTextInput;
 
+            console.log('Starting game with settings:', {
+              allowHostToPlay,
+              enableTextInputMode,
+              totalRounds,
+              gameMode,
+              partyTextInput,
+              partyHostPlays,
+            });
+
             try {
               // First, update settings in the database
-              await updateSettings.mutateAsync({
+              const updatedSession = await updateSettings.mutateAsync({
                 sessionId,
                 totalRounds,
                 allowHostToPlay,
                 enableTextInputMode,
               });
 
+              console.log('Settings updated successfully:', updatedSession);
+
               // Then start the game
               onStartGame();
             } catch (error) {
+              console.error('Failed to start game:', error);
               toast.error("Error", {
                 description: error instanceof Error ? error.message : "Failed to start game",
               });
