@@ -32,10 +32,10 @@ ADD CONSTRAINT valid_game_state CHECK (
 );
 
 -- 5. Ensure valid current_round values
--- current_round should be between 0 (lobby) and 10 (max rounds)
+-- current_round should be between 0 (lobby) and 50 (max rounds)
 ALTER TABLE game_sessions
 ADD CONSTRAINT valid_current_round CHECK (
-  current_round >= 0 AND current_round <= 10
+  current_round >= 0 AND current_round <= 50
 );
 
 -- 6. Ensure player scores are reasonable
@@ -59,7 +59,7 @@ COMMENT ON CONSTRAINT valid_game_state ON game_sessions IS
   'Ensures game state is one of the valid state machine states';
 
 COMMENT ON CONSTRAINT valid_current_round ON game_sessions IS
-  'Ensures current_round is within valid range (0 for lobby, 1-10 for active rounds)';
+  'Ensures current_round is within valid range (0 for lobby, 1-50 for active rounds)';
 
 COMMENT ON CONSTRAINT reasonable_score ON players IS
   'Prevents unrealistic scores that would indicate data corruption';

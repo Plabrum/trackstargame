@@ -9,7 +9,13 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:restart": "supabase stop && supabase start",
+    "supabase:status": "supabase status",
+    "supabase:reset": "supabase db reset",
+    "db:generate-types": "supabase gen types typescript --local > lib/types/database.ts"
   },
   "dependencies": {
     "@radix-ui/react-collapsible": "^1.1.12",
