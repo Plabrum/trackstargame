@@ -47,7 +47,7 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
         player={soloPlayer}
         rounds={rounds}
         onPlayAgain={onPlayAgain}
-        albumArtUrl={albumArt}
+        albumArtUrl={albumArt ?? undefined}
       />
     );
   }

@@ -51,7 +51,7 @@ export function HostFinalScore({ players, rounds, onPlayAgain, currentPlayerId }
         player={soloPlayer}
         rounds={rounds}
         onPlayAgain={onPlayAgain}
-        albumArtUrl={albumArt}
+        albumArtUrl={albumArt ?? undefined}
       />
     );
   }

@@ -4,10 +4,11 @@
  * Uses Supabase-native approach with direct queries and postgres_changes realtime.
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { TableRow } from '@/lib/types/database-helpers';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 type GameSession = TableRow<'game_sessions'>;
 type Player = TableRow<'players'>;
@@ -19,7 +20,7 @@ type Track = TableRow<'tracks'>;
  *
  * Uses direct Supabase query
  */
-export function useGameSession(sessionId: string | null) {
+export function useGameSession(sessionId: string | null): UseQueryResult<GameSession | null, Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -39,7 +40,7 @@ export function useGameSession(sessionId: string | null) {
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
-    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
+    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -76,7 +77,7 @@ export function useGameSession(sessionId: string | null) {
  *
  * Uses direct Supabase query
  */
-export function useGamePlayers(sessionId: string | null) {
+export function useGamePlayers(sessionId: string | null): UseQueryResult<Player[], Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -97,7 +98,7 @@ export function useGamePlayers(sessionId: string | null) {
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
     refetchOnMount: true, // Refetch when component mounts
-    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
+    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -136,7 +137,7 @@ export function useGamePlayers(sessionId: string | null) {
  *
  * Uses direct Supabase query
  */
-export function useGameRounds(sessionId: string | null) {
+export function useGameRounds(sessionId: string | null): UseQueryResult<GameRound[], Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -156,7 +157,7 @@ export function useGameRounds(sessionId: string | null) {
     },
     enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
-    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
+    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -195,7 +196,7 @@ export function useGameRounds(sessionId: string | null) {
  *
  * Uses direct Supabase query (no realtime needed for static track data)
  */
-export function useTrack(trackId: string | null) {
+export function useTrack(trackId: string | null): UseQueryResult<Track | null, Error> {
   const supabase = createClient();
 
   const query = useQuery({
@@ -228,7 +229,7 @@ export function useTrack(trackId: string | null) {
  *
  * Uses direct Supabase query
  */
-export function useRoundAnswers(sessionId: string | null, roundNumber: number | null) {
+export function useRoundAnswers(sessionId: string | null, roundNumber: number | null): UseQueryResult<TableRow<'round_answers'>[], Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -259,7 +260,7 @@ export function useRoundAnswers(sessionId: string | null, roundNumber: number | 
     },
     enabled: !!sessionId && !!roundNumber,
     staleTime: 0, // Always consider data stale for immediate updates
-    refetcgInterval: 1000, // Poll every 2 seconds as fallback for lost websocket messages
+    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -297,7 +298,7 @@ export function useRoundAnswers(sessionId: string | null, roundNumber: number | 
  *
  * Requires Spotify access token.
  */
-export function useSpotifyAlbumArt(spotifyId: string | null, accessToken: string | null) {
+export function useSpotifyAlbumArt(spotifyId: string | null, accessToken: string | null): UseQueryResult<string | null, Error> {
   const query = useQuery({
     queryKey: ['spotify-album-art', spotifyId],
     queryFn: async () => {
