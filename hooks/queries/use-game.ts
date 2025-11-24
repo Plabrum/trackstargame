@@ -20,15 +20,13 @@ type Track = TableRow<'tracks'>;
  *
  * Uses direct Supabase query
  */
-export function useGameSession(sessionId: string | null): UseQueryResult<GameSession | null, Error> {
+export function useGameSession(sessionId: string): UseQueryResult<GameSession | null, Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
   const query = useQuery({
     queryKey: ['sessions', sessionId],
     queryFn: async () => {
-      if (!sessionId) return null;
-
       const { data, error } = await supabase
         .from('game_sessions')
         .select('*')
@@ -38,15 +36,12 @@ export function useGameSession(sessionId: string | null): UseQueryResult<GameSes
       if (error) throw error;
       return data as GameSession;
     },
-    enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
     refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!sessionId) return;
-
     const supabase = createClient();
     const channel = supabase
       .channel(`game:${sessionId}`)
@@ -77,15 +72,13 @@ export function useGameSession(sessionId: string | null): UseQueryResult<GameSes
  *
  * Uses direct Supabase query
  */
-export function useGamePlayers(sessionId: string | null): UseQueryResult<Player[], Error> {
+export function useGamePlayers(sessionId: string): UseQueryResult<Player[], Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
   const query = useQuery({
     queryKey: ['sessions', sessionId, 'players'],
     queryFn: async () => {
-      if (!sessionId) return [];
-
       const { data, error } = await supabase
         .from('players')
         .select('*')
@@ -95,7 +88,6 @@ export function useGamePlayers(sessionId: string | null): UseQueryResult<Player[
       if (error) throw error;
       return data as Player[];
     },
-    enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
     refetchOnMount: true, // Refetch when component mounts
     refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
@@ -103,8 +95,6 @@ export function useGamePlayers(sessionId: string | null): UseQueryResult<Player[
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!sessionId) return;
-
     const supabase = createClient();
     const channel = supabase
       .channel(`players:${sessionId}`)
@@ -137,15 +127,13 @@ export function useGamePlayers(sessionId: string | null): UseQueryResult<Player[
  *
  * Uses direct Supabase query
  */
-export function useGameRounds(sessionId: string | null): UseQueryResult<GameRound[], Error> {
+export function useGameRounds(sessionId: string): UseQueryResult<GameRound[], Error> {
   const queryClient = useQueryClient();
   const supabase = createClient();
 
   const query = useQuery({
     queryKey: ['sessions', sessionId, 'rounds'],
     queryFn: async () => {
-      if (!sessionId) return [];
-
       const { data, error } = await supabase
         .from('game_rounds')
         .select('*')
@@ -155,15 +143,12 @@ export function useGameRounds(sessionId: string | null): UseQueryResult<GameRoun
       if (error) throw error;
       return data as GameRound[];
     },
-    enabled: !!sessionId,
     staleTime: 0, // Always consider data stale for immediate updates
     refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!sessionId) return;
-
     const supabase = createClient();
     const channel = supabase
       .channel(`rounds:${sessionId}`)

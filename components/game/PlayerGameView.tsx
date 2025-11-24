@@ -1,7 +1,7 @@
 /**
  * Player Game View (Action-Based Refactor)
  *
- * Displays the game state and uses PlayerActionsPanel for all controls.
+ * Displays the game state and uses generic actions from state machine.
  * All game logic is driven by the state machine.
  */
 
@@ -14,12 +14,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music } from "lucide-react";
 import { BuzzAnimation } from "./BuzzAnimation";
 import { AnimatedScore } from "./ScoreAnimation";
-import { PlayerActionsPanel } from "./PlayerActionsPanel";
+import { ActionButtonGroup, ActionButton } from "./ActionButton";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { RoundTimer } from "./RoundTimer";
 import { TrackReveal } from "./TrackReveal";
 import { Header } from "@/components/shared/Header";
+import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
+import { useGameActions } from "@/hooks/useGameActions";
 import type { Tables } from "@/lib/types/database";
+import type { GameAction } from "@/lib/game/state-machine";
+import { Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type RoundJudgment = {
   playerId: string;
@@ -38,13 +43,11 @@ interface PlayerGameViewProps {
   currentRound?: GameRound | null;
   currentTrack?: { title: string; artist: string } | null;
   buzzerPlayer?: Player | null;
-  onBuzz: () => void;
-  isBuzzing: boolean;
+  executeAction: (action: GameAction) => void;
+  isActionLoading: (actionType: GameAction['type']) => boolean;
   roundJudgment?: RoundJudgment | null;
 
   // Text input mode props
-  onSubmitAnswer?: (answer: string) => void;
-  isSubmittingAnswer?: boolean;
   hasSubmittedAnswer?: boolean;
   answerFeedback?: {
     isCorrect: boolean;
@@ -60,11 +63,9 @@ export function PlayerGameView({
   currentRound,
   currentTrack,
   buzzerPlayer,
-  onBuzz,
-  isBuzzing,
+  executeAction,
+  isActionLoading,
   roundJudgment,
-  onSubmitAnswer,
-  isSubmittingAnswer,
   hasSubmittedAnswer,
   answerFeedback,
 }: PlayerGameViewProps) {
@@ -78,8 +79,16 @@ export function PlayerGameView({
   const currentPlayerRank = sortedPlayers.findIndex((p) => p.id === currentPlayerId) + 1;
 
   const hasBuzzed = buzzerPlayer?.id === currentPlayerId;
-  const isTextInputMode = session.enable_text_input_mode ?? false;
   const isSinglePlayer = players.length === 1;
+
+  // Get available actions from state machine
+  const availableActions = useGameActions({
+    role: 'player',
+    session,
+    players,
+    currentRound,
+    playerId: currentPlayerId,
+  });
 
   // Buzz animation state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
@@ -97,8 +106,8 @@ export function PlayerGameView({
   const renderStateInfo = () => {
     switch (state) {
       case 'playing':
-        // Show answer submitted message for text input mode
-        if (hasSubmittedAnswer && isTextInputMode) {
+        // Show answer submitted message
+        if (hasSubmittedAnswer) {
           return (
             <Alert>
               <AlertDescription>
@@ -269,20 +278,45 @@ export function PlayerGameView({
             {/* State Information Display */}
             {renderStateInfo()}
 
-            {/* ACTION-BASED CONTROLS */}
-            {onSubmitAnswer && (
-              <PlayerActionsPanel
-                session={session}
-                players={players}
-                playerId={currentPlayerId}
-                currentRound={currentRound}
-                onBuzz={onBuzz}
-                onSubmitAnswer={onSubmitAnswer}
-                isBuzzing={isBuzzing}
-                isSubmittingAnswer={isSubmittingAnswer}
-                hasSubmittedAnswer={hasSubmittedAnswer}
-              />
-            )}
+            {/* GENERIC ACTION CONTROLS */}
+            <ActionButtonGroup
+              actions={availableActions}
+              onAction={executeAction}
+              loadingAction={availableActions.find(a => isActionLoading(a.action.type))?.action.type}
+              layout="flex"
+              size="lg"
+              showDisabledReasons={true}
+              customRenderers={{
+                // Custom buzz button - big, orange, emphasised
+                buzz: (actionDesc, isLoading) => (
+                  <Button
+                    size="lg"
+                    className="w-full h-32 text-3xl font-bold bg-orange hover:bg-orange/90 active:scale-95 transition-transform"
+                    onClick={() => executeAction(actionDesc.action)}
+                    disabled={!actionDesc.enabled || isLoading}
+                  >
+                    {isLoading ? (
+                      "BUZZING..."
+                    ) : (
+                      <>
+                        <Zap className="h-10 w-10 mr-3" />
+                        BUZZ IN!
+                      </>
+                    )}
+                  </Button>
+                ),
+                // Custom submit answer form - input field instead of button
+                submit_answer: (actionDesc, isLoading) => (
+                  !hasSubmittedAnswer ? (
+                    <AnswerInputForm
+                      onSubmit={(answer) => executeAction({ type: 'submit_answer', answer })}
+                      isSubmitting={isLoading}
+                      disabled={!actionDesc.enabled}
+                    />
+                  ) : null
+                ),
+              }}
+            />
           </div>
         </CardContent>
       </Card>

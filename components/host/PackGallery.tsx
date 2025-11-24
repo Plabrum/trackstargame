@@ -7,16 +7,17 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PackCard } from "./PackCard";
 import { PackSongsSheet } from "./PackSongsSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 import type { Database } from "@/lib/types/database";
 
 type Pack = Database['public']['Tables']['packs']['Row'] & {
@@ -29,9 +30,10 @@ export function PackGallery() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [startingPackId, setStartingPackId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const hasShownErrorToast = useRef(false);
 
   // Fetch all packs with track counts using direct Supabase query
-  const { data: packs, isLoading, error } = useQuery({
+  const { data: packs = [], isLoading, error } = useQuery({
     queryKey: ['packs', 'with-counts'],
     queryFn: async () => {
       const supabase = createClient();
@@ -59,6 +61,17 @@ export function PackGallery() {
       return packsWithCounts;
     },
   });
+
+  // Show toast on error (only once per error)
+  useEffect(() => {
+    if (error && !hasShownErrorToast.current) {
+      console.error('Failed to load packs:', error);
+      toast.error("Failed to load packs", {
+        description: "Please try again",
+      });
+      hasShownErrorToast.current = true;
+    }
+  }, [error]);
 
   // Fuzzy search/filter logic
   const filteredPacks = useMemo(() => {
@@ -102,9 +115,10 @@ export function PackGallery() {
       router.push(`/host/${data.id}`);
     },
     onError: (error) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Failed to create session:', error);
-      }
+      console.error('Failed to create session:', error);
+      toast.error("Failed to create game session", {
+        description: "Please try again",
+      });
       setStartingPackId(null);
     },
   });
@@ -128,17 +142,6 @@ export function PackGallery() {
           </div>
         ))}
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load packs. Please try again.
-        </AlertDescription>
-      </Alert>
     );
   }
 
@@ -207,18 +210,6 @@ export function PackGallery() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
-
-      {/* Error Toast (if mutation fails) */}
-      {createSession.isError && (
-        <div className="fixed bottom-4 right-4 max-w-md">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              Failed to create game session
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
     </>
   );
 }

@@ -166,19 +166,6 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
         </Alert>
       )}
 
-      {spotifyError && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            {spotifyError}
-            <br />
-            <span className="text-sm">
-              Try refreshing the page or signing in again. Spotify Premium may be required for full playback.
-            </span>
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Start Game Section */}
       {!canStart && (
         <Alert className="mb-4">

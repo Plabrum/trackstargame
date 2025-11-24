@@ -2,76 +2,51 @@
 
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { useGameSession, useGamePlayers, useGameRounds } from "@/hooks/queries/use-game";
-import { useJoinSession, useSubmitAnswer } from "@/hooks/mutations/use-game-mutations";
-import { usePlayer } from "@/hooks/usePlayer";
+import { useGameSession, useGamePlayers, useGameRounds, useTrack } from "@/hooks/queries/use-game";
+import { useSubmitAnswer, useBuzz } from "@/hooks/mutations/use-game-mutations";
+import { usePlayerIdentity } from "@/hooks/usePlayerIdentity";
+import { useGameExecutor } from "@/hooks/useGameExecutor";
 import { PlayerLobby } from "@/components/game/PlayerLobby";
 import { PlayerGameView } from "@/components/game/PlayerGameView";
 import { PlayerFinalScore } from "@/components/game/PlayerFinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "sonner";
-import { validateAnswer } from "@/lib/game/answer-validation";
 
 export default function PlayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
 
   // Player ID state (stored in localStorage)
-  const [playerId, setPlayerId] = useState<string | null>(null);
-
-  // Load player ID from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(`player_${id}`);
-    if (stored) {
-      setPlayerId(stored);
-    }
-  }, [id]);
+  const { playerId, setPlayerId } = usePlayerIdentity(id);
 
   // Fetch game data
   const { data: session, isLoading: isLoadingSession, error: sessionError } = useGameSession(id);
   const { data: players = [], isLoading: isLoadingPlayers } = useGamePlayers(id);
   const { data: rounds = [] } = useGameRounds(id);
 
-  // Get current round data (needed for track query - must be before early returns)
+  // Get current round data
   const currentRound = rounds.find((r) => r.round_number === session?.current_round);
 
-  // Fetch track details for current round (must be before early returns)
-  const { data: currentTrack } = useQuery({
-    queryKey: ['tracks', currentRound?.track_id],
-    queryFn: async () => {
-      if (!currentRound?.track_id) return null;
+  // Fetch track details for current round
+  const { data: currentTrack } = useTrack(currentRound?.track_id ?? null);
 
-      const supabase = await import('@/lib/supabase/client').then(m => m.createClient());
-      const { data, error } = await supabase
-        .from('tracks')
-        .select('*')
-        .eq('id', currentRound.track_id)
-        .single();
+  // Mutations
+  const buzz = useBuzz();
+  const submitAnswer = useSubmitAnswer();
 
-      if (error) {
-        console.error('Failed to fetch track:', error);
-        return null;
-      }
-
-      return data;
+  // Game action executor
+  const { executeAction, isActionLoading } = useGameExecutor({
+    sessionId: id,
+    mutations: {
+      buzz,
+      submitAnswer,
     },
-    enabled: !!currentRound?.track_id && !!session && (
-      session.state === 'buzzed' ||
-      session.state === 'reveal' ||
-      (session.state === 'playing' && session.enable_text_input_mode)
-    ),
+    context: {
+      playerId: playerId ?? undefined,
+      currentRound: session?.current_round ?? undefined,
+    },
   });
 
-  // Join session mutation
-  const joinSession = useJoinSession();
-
-  // Player controls
-  const { buzz, isBuzzing } = usePlayer(id, playerId, session?.current_round);
-
-  // Submit answer mutation (text input mode)
-  const submitAnswer = useSubmitAnswer();
+  // Answer feedback state
   const [answerFeedback, setAnswerFeedback] = useState<{
     isCorrect: boolean;
     correctAnswer: string;
@@ -83,68 +58,6 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     setAnswerFeedback(null);
   }, [session?.current_round]);
 
-  const handleJoin = (playerName: string) => {
-    joinSession.mutate(
-      { sessionId: id, playerName },
-      {
-        onSuccess: (player) => {
-          setPlayerId(player.id);
-          localStorage.setItem(`player_${id}`, player.id);
-        },
-        onError: (error) => {
-          toast.error("Failed to join", {
-            description: error.message,
-          });
-        },
-      }
-    );
-  };
-
-  const handleSubmitAnswer = async (answer: string) => {
-    if (!playerId || !currentTrack || !session) return;
-
-    // Calculate elapsed time
-    const roundStartTime = session.round_start_time;
-    if (!roundStartTime) {
-      toast.error("Error", {
-        description: "Round has not started yet",
-      });
-      return;
-    }
-
-    // Validate answer and calculate points
-    const { autoValidated, pointsAwarded } = validateAnswer(
-      roundStartTime,
-      answer,
-      currentTrack.artist
-    );
-
-    submitAnswer.mutate(
-      {
-        sessionId: id,
-        playerId,
-        answer,
-        autoValidated,
-        pointsAwarded,
-      },
-      {
-        onSuccess: (data) => {
-          // Show feedback
-          setAnswerFeedback({
-            isCorrect: autoValidated,
-            correctAnswer: currentTrack.artist,
-            pointsEarned: pointsAwarded,
-          });
-        },
-        onError: (error) => {
-          toast.error("Failed to submit answer", {
-            description: error.message,
-          });
-        },
-      }
-    );
-  };
-
   // Loading state
   if (isLoadingSession || isLoadingPlayers) {
     return (
@@ -155,32 +68,18 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
     );
   }
 
-  // Error state
+  // Error state - redirect to home
   if (sessionError || !session) {
-    return (
-      <div className="container mx-auto p-6 max-w-2xl">
-        <Alert variant="destructive">
-          <AlertDescription>
-            {sessionError?.message || "Game session not found"}
-          </AlertDescription>
-        </Alert>
-        <button
-          onClick={() => router.push("/")}
-          className="mt-4 text-sm text-muted-foreground hover:underline"
-        >
-          ← Back to home
-        </button>
-      </div>
-    );
+    if (!isLoadingSession) {
+      router.push("/");
+    }
+    return null;
   }
 
   // Get buzzer player
   const buzzerPlayer = currentRound?.buzzer_player_id
     ? players.find((p) => p.id === currentRound.buzzer_player_id)
     : null;
-
-  // Check if player can buzz - requires playing state, no buzzer, and round must have started
-  const canBuzz = session.state === 'playing' && !buzzerPlayer && !!session.round_start_time;
 
   // Render appropriate view based on game state
   if (session.state === 'finished') {
@@ -201,38 +100,30 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
         hostName={session.host_name}
         players={players}
         currentPlayerId={playerId}
-        onJoin={handleJoin}
-        isJoining={joinSession.isPending}
-        joinError={joinSession.error}
+        onPlayerJoined={setPlayerId}
       />
     );
   }
 
-  // Must have joined to play
-  if (!playerId) {
-    return (
-      <div className="container mx-auto p-6 max-w-2xl">
-        <Alert variant="destructive">
-          <AlertDescription>
-            You must join the game first. Please refresh and join from the lobby.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
+  // Must have joined to play (lobby is OK without playerId)
+  if (session.state !== 'lobby' && !playerId) {
+    // Game is active but no player ID - shouldn't happen in normal flow
+    return null;
   }
 
+  // At this point, playerId must be non-null (checked above)
   return (
     <PlayerGameView
       session={session}
       players={players}
-      currentPlayerId={playerId}
+      currentPlayerId={playerId!}
       currentRound={currentRound}
       currentTrack={currentTrack}
       buzzerPlayer={buzzerPlayer}
-      onBuzz={buzz}
-      isBuzzing={isBuzzing}
+      executeAction={executeAction}
+      isActionLoading={isActionLoading}
       roundJudgment={
-        currentRound?.buzzer_player_id === playerId && currentRound?.correct !== null
+        currentRound?.buzzer_player_id === playerId && currentRound?.correct !== null && currentRound.buzzer_player_id !== null
           ? {
               playerId: currentRound.buzzer_player_id,
               correct: currentRound.correct,
@@ -240,8 +131,6 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
             }
           : null
       }
-      onSubmitAnswer={handleSubmitAnswer}
-      isSubmittingAnswer={submitAnswer.isPending}
       hasSubmittedAnswer={submitAnswer.isSuccess}
       answerFeedback={answerFeedback}
     />

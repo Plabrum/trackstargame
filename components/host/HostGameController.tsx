@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Music, AlertTriangle } from "lucide-react";
 import { BuzzAnimation } from "@/components/game/BuzzAnimation";
 import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
-import { HostActionsPanel } from "./HostActionsPanel";
+import { ActionButtonGroup } from "@/components/game/ActionButton";
 import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
 import { Header } from "@/components/shared/Header";
 import { UserInfo } from "@/components/shared/UserInfo";
@@ -24,8 +24,10 @@ import { GameStateDisplay } from "./ui/GameStateDisplay";
 import { PlayerScoreboard } from "./ui/PlayerScoreboard";
 import { AnswerReviewPanel } from "./ui/AnswerReviewPanel";
 import { RoundSummary } from "./ui/RoundSummary";
+import { useGameActions } from "@/hooks/useGameActions";
 import type { Tables } from "@/lib/types/database";
 import type { UseSpotifyPlayerReturn } from "@/hooks/useSpotifyPlayer";
+import type { GameAction } from "@/lib/game/state-machine";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
@@ -42,18 +44,8 @@ interface GameData {
 }
 
 interface GameActions {
-  onJudgeCorrect: () => void;
-  onJudgeIncorrect: () => void;
-  onNextRound: () => void;
-  onRevealTrack: () => void;
-  onEndGame: () => void;
-}
-
-interface LoadingStates {
-  isJudging: boolean;
-  isAdvancing: boolean;
-  isRevealing: boolean;
-  isEndingGame: boolean;
+  executeAction: (action: GameAction) => void;
+  isActionLoading: (actionType: GameAction['type']) => boolean;
 }
 
 interface SoloModeProps {
@@ -77,9 +69,7 @@ interface TextInputModeProps {
 interface HostGameControllerProps {
   gameData: GameData;
   gameActions: GameActions;
-  loadingStates: LoadingStates;
   spotifyPlayer: UseSpotifyPlayerReturn;
-  playerError: string | null;
   soloMode?: SoloModeProps;
   textInputMode?: TextInputModeProps;
 }
@@ -87,15 +77,12 @@ interface HostGameControllerProps {
 export function HostGameController({
   gameData,
   gameActions,
-  loadingStates,
   spotifyPlayer,
-  playerError,
   soloMode,
   textInputMode,
 }: HostGameControllerProps) {
   const { session, players, currentTrack, currentRound, buzzerPlayer, elapsedSeconds } = gameData;
-  const { onJudgeCorrect, onJudgeIncorrect, onNextRound, onRevealTrack, onEndGame } = gameActions;
-  const { isJudging, isAdvancing, isRevealing, isEndingGame } = loadingStates;
+  const { executeAction, isActionLoading } = gameActions;
 
   const hasStartedPlayingRef = useRef(false);
 
@@ -120,6 +107,15 @@ export function HostGameController({
   const currentRoundNum = session.current_round || 0;
   const totalRounds = session.total_rounds;
   const state = session.state;
+
+  // Get available actions from state machine
+  const availableActions = useGameActions({
+    role: 'host',
+    session,
+    players,
+    currentRound,
+    submittedAnswers: textInputMode?.submittedAnswers,
+  });
 
   // Auto-play track when round starts
   useEffect(() => {
@@ -184,20 +180,6 @@ export function HostGameController({
             <Music className="h-4 w-4 animate-spin" />
             <AlertDescription>
               Initializing Spotify player... This may take a few seconds.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Error Display */}
-        {(playerError || spotifyError) && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              {playerError || spotifyError}
-              <br />
-              <span className="text-sm">
-                Try refreshing the page or signing in again. Spotify Premium may be required for full playback.
-              </span>
             </AlertDescription>
           </Alert>
         )}
@@ -271,28 +253,25 @@ export function HostGameController({
                   />
                 )}
 
-                {/* ACTION-BASED CONTROLS */}
-                <HostActionsPanel
-                  session={session}
-                  players={players}
-                  currentRound={currentRound}
-                  submittedAnswers={textInputMode?.submittedAnswers}
-                  onStartGame={() => { }}
-                  onJudgeAnswer={(correct) => {
-                    correct ? onJudgeCorrect() : onJudgeIncorrect();
+                {/* GENERIC ACTION CONTROLS */}
+                <ActionButtonGroup
+                  actions={availableActions}
+                  onAction={(action) => {
+                    // Handle judgment overrides for finalize_judgments action
+                    if (action.type === 'finalize_judgments') {
+                      executeAction({
+                        ...action,
+                        overrides: action.overrides ?? judgmentOverrides,
+                      });
+                    } else {
+                      executeAction(action);
+                    }
                   }}
-                  onAdvanceRound={onNextRound}
-                  onRevealAnswer={onRevealTrack}
-                  onEndGame={onEndGame}
-                  onUpdateSettings={() => { }}
-                  onFinalizeJudgments={(overrides) =>
-                    textInputMode?.onFinalizeJudgment(overrides ?? judgmentOverrides)
-                  }
-                  isJudging={isJudging}
-                  isAdvancing={isAdvancing}
-                  isRevealing={isRevealing}
-                  isEndingGame={isEndingGame}
-                  isFinalizing={textInputMode?.isFinalizing}
+                  loadingAction={availableActions.find(a => isActionLoading(a.action.type))?.action.type}
+                  layout="grid"
+                  columns={2}
+                  size="lg"
+                  showDisabledReasons={true}
                 />
               </CardContent>
             </Card>
