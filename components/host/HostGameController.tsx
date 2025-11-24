@@ -90,7 +90,7 @@ export function HostGameController(props: HostGameControllerProps) {
           // Don't set hasStartedPlayingRef to true on failure, so we can retry
         });
     }
-  }, [props.session.state, currentSpotifyId, isReady, play]);
+  }, [props.session.state, props.currentRound?.round_number, currentSpotifyId, isReady, play]);
 
   // Auto-pause when someone buzzes
   useEffect(() => {
@@ -103,12 +103,12 @@ export function HostGameController(props: HostGameControllerProps) {
     }
   }, [props.session.state, isPlaying, pause]);
 
-  // Reset playing flag when state changes away from playing
+  // Reset playing flag when state changes away from playing or when round changes
   useEffect(() => {
     if (props.session.state !== 'playing') {
       hasStartedPlayingRef.current = false;
     }
-  }, [props.session.state]);
+  }, [props.session.state, props.currentRound?.round_number]);
 
   return (
     <div>
