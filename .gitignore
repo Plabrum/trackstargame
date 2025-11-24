@@ -42,6 +42,7 @@ next-env.d.ts
 # Supabase
 supabase/.temp
 supabase/.branches
+supabase/seed_data/
 .mcp.json
 
 # Python
@@ -55,3 +56,4 @@ scripts/venv/
 *.egg-info/
 .pytest_cache/
 scripts/.cache
+supabase/seed.sql
