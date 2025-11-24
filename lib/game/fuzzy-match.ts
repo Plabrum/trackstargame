@@ -110,17 +110,3 @@ export function fuzzyMatch(
   const similarity = calculateSimilarity(submittedAnswer, correctAnswer);
   return similarity >= threshold;
 }
-
-/**
- * Match a submitted answer against multiple possible correct answers (e.g., multiple artists).
- * Returns true if the answer matches any of the correct answers.
- */
-export function fuzzyMatchAny(
-  submittedAnswer: string,
-  correctAnswers: string[],
-  threshold: number = 80
-): boolean {
-  return correctAnswers.some((correctAnswer) =>
-    fuzzyMatch(submittedAnswer, correctAnswer, threshold)
-  );
-}

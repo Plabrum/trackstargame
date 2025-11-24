@@ -12,8 +12,7 @@ import { PlayerFinalScore } from "@/components/game/PlayerFinalScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { fuzzyMatch } from "@/lib/game/fuzzy-match";
-import { calculatePoints } from "@/lib/game/state-machine";
+import { validateAnswer } from "@/lib/game/answer-validation";
 
 export default function PlayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -113,14 +112,12 @@ export default function PlayPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
 
-    const elapsedMs = Date.now() - new Date(roundStartTime).getTime();
-    const elapsedSeconds = elapsedMs / 1000;
-
-    // Auto-validate answer using fuzzy matching
-    const autoValidated = fuzzyMatch(answer, currentTrack.artist, 80);
-
-    // Calculate points if correct
-    const pointsAwarded = autoValidated ? calculatePoints(elapsedSeconds, true) : 0;
+    // Validate answer and calculate points
+    const { autoValidated, pointsAwarded } = validateAnswer(
+      roundStartTime,
+      answer,
+      currentTrack.artist
+    );
 
     submitAnswer.mutate(
       {

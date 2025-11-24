@@ -13,8 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
 import { useSpotifyPlayer } from "@/hooks/useSpotifyPlayer";
 import { toast } from "sonner";
-import { fuzzyMatch } from "@/lib/game/fuzzy-match";
-import { calculatePoints } from "@/lib/game/state-machine";
+import { validateAnswer } from "@/lib/game/answer-validation";
 import { useSpotifyAuth } from "@/lib/spotify-auth-context";
 
 export default function HostPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,14 +134,12 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
 
-    const elapsedMs = Date.now() - new Date(roundStartTime).getTime();
-    const elapsedSeconds = elapsedMs / 1000;
-
-    // Auto-validate answer using fuzzy matching
-    const autoValidated = fuzzyMatch(answer, currentTrack.artist, 80);
-
-    // Calculate points if correct
-    const pointsAwarded = autoValidated ? calculatePoints(elapsedSeconds, true) : 0;
+    // Validate answer and calculate points
+    const { autoValidated, pointsAwarded } = validateAnswer(
+      roundStartTime,
+      answer,
+      currentTrack.artist
+    );
 
     console.log('Submitting answer:', {
       answer,
@@ -247,46 +244,60 @@ export default function HostPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <HostGameController
-      session={session}
-      players={players}
-      currentTrack={currentTrack}
-      currentRound={currentRound}
-      buzzerPlayer={buzzerPlayer}
-      elapsedSeconds={currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null}
-      onJudgeCorrect={() => {
-        judgeAnswer(true);
+      gameData={{
+        session,
+        players,
+        currentTrack,
+        currentRound,
+        buzzerPlayer,
+        elapsedSeconds: currentRound?.elapsed_seconds ? Number(currentRound.elapsed_seconds) : null,
       }}
-      onJudgeIncorrect={() => {
-        judgeAnswer(false);
+      gameActions={{
+        onJudgeCorrect: () => judgeAnswer(true),
+        onJudgeIncorrect: () => judgeAnswer(false),
+        onNextRound: nextRound,
+        onRevealTrack: revealTrack,
+        onEndGame: endGame,
       }}
-      onNextRound={nextRound}
-      onRevealTrack={revealTrack}
-      onEndGame={endGame}
-      isJudging={isJudging}
-      isAdvancing={isAdvancing}
-      isRevealing={isRevealing}
-      isEndingGame={isEndingGame}
+      loadingStates={{
+        isJudging,
+        isAdvancing,
+        isRevealing,
+        isEndingGame,
+      }}
       spotifyPlayer={spotifyPlayer}
       playerError={playerError}
-      hostPlayerId={hostPlayer?.id}
-      onSubmitAnswer={handleSubmitAnswer}
-      isSubmittingAnswer={submitAnswer.isPending}
-      hasSubmittedAnswer={submitAnswer.isSuccess}
-      answerFeedback={answerFeedback}
-      submittedAnswers={submittedAnswers}
-      onFinalizeJudgment={(overrides) => {
-        finalizeJudgments.mutate(
-          { sessionId: id, overrides },
-          {
-            onError: (error) => {
-              toast.error("Failed to finalize judgments", {
-                description: error.message,
-              });
-            },
+      soloMode={
+        hostPlayer
+          ? {
+            hostPlayerId: hostPlayer.id,
+            onSubmitAnswer: handleSubmitAnswer,
+            isSubmitting: submitAnswer.isPending,
+            hasSubmitted: submitAnswer.isSuccess,
+            answerFeedback,
           }
-        );
-      }}
-      isFinalizing={finalizeJudgments.isPending}
+          : undefined
+      }
+      textInputMode={
+        submittedAnswers
+          ? {
+            submittedAnswers,
+            onFinalizeJudgment: (overrides) => {
+              finalizeJudgments.mutate(
+                { sessionId: id, overrides },
+                {
+                  onError: (error) => {
+                    toast.error("Failed to finalize judgments", {
+                      description: error.message,
+                    });
+                  },
+                }
+              );
+            },
+            isFinalizing: finalizeJudgments.isPending,
+          }
+          : undefined
+      }
     />
   );
 }

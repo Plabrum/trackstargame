@@ -132,20 +132,3 @@ export function useSpotifyAuth(): SpotifyAuthState {
   }
   return context;
 }
-
-/**
- * Hook to access the current Spotify user (convenience wrapper)
- * User is guaranteed to be non-null since this provider only renders in authenticated contexts
- *
- * @example
- * ```tsx
- * function ProtectedComponent() {
- *   const user = useSpotifyUser();
- *   return <p>Hello, {user.display_name}!</p>;
- * }
- * ```
- */
-export function useSpotifyUser(): SpotifyUser {
-  const { user } = useSpotifyAuth();
-  return user;
-}
