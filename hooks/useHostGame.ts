@@ -54,14 +54,16 @@ export function useHostGame(sessionId: string) {
     },
   });
 
-  // Fetch game data
-  const { data: session, isLoading: isLoadingSession, error: sessionError } = useGameSession(sessionId);
+  // Fetch game data (session is provided by layout context, always non-null)
   const { data: players = [], isLoading: isLoadingPlayers } = useGamePlayers(sessionId);
   const { data: rounds = [] } = useGameRounds(sessionId);
+
+  // Note: We still need to fetch session for realtime updates within the hook
+  const { data: session } = useGameSession(sessionId);
   const { data: submittedAnswers = [] } = useRoundAnswers(sessionId, session?.current_round ?? null);
 
   // Derive data
-  const currentRound = session ? rounds.find((r) => r.round_number === session.current_round) : null;
+  const currentRound = rounds.find((r) => r.round_number === session?.current_round);
   const buzzerPlayer = currentRound?.buzzer_player_id
     ? players.find((p) => p.id === currentRound.buzzer_player_id)
     : null;
@@ -101,15 +103,15 @@ export function useHostGame(sessionId: string) {
 
   // Handle answer submission for host player
   const handleSubmitAnswer = async (answer: string) => {
-    if (!hostPlayer || !currentTrack || !session) {
-      console.error('Missing required data:', { hostPlayer, currentTrack, session });
+    if (!hostPlayer || !currentTrack) {
+      console.error('Missing required data:', { hostPlayer, currentTrack });
       toast.error("Error", {
         description: "Missing required data. Please refresh the page.",
       });
       return;
     }
 
-    const roundStartTime = session.round_start_time;
+    const roundStartTime = session?.round_start_time;
     if (!roundStartTime) {
       toast.error("Error", {
         description: "Round has not started yet",
@@ -149,21 +151,11 @@ export function useHostGame(sessionId: string) {
     );
   };
 
-  // Show session errors as toasts
-  useEffect(() => {
-    if (sessionError) {
-      toast.error("Failed to load game session", {
-        description: sessionError.message,
-      });
-    }
-  }, [sessionError]);
-
-  // While loading, return loading state
-  const isLoading = isLoadingSession || isLoadingPlayers;
-  if (isLoading) {
+  // While loading players, return loading state
+  if (isLoadingPlayers) {
     return {
       isLoading: true,
-      session: null as never,
+      session: session ?? ({} as Tables<'game_sessions'>),
       players: [] as never,
       rounds: [] as never,
       currentRound: null as never,
@@ -182,17 +174,12 @@ export function useHostGame(sessionId: string) {
     };
   }
 
-  // If session failed to load, throw error (will be caught by error boundary)
-  if (!session) {
-    throw new Error(sessionError?.message || 'Failed to load game session');
-  }
-
-  // Session exists - return non-nullable session
+  // Session is guaranteed by layout, return data
   return {
     isLoading: false,
 
-    // Data (session is non-nullable here)
-    session: session as Tables<'game_sessions'>,
+    // Data (session is guaranteed by layout context)
+    session: session ?? ({} as Tables<'game_sessions'>),
     players,
     rounds,
     currentRound,

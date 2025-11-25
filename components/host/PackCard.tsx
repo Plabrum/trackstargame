@@ -31,37 +31,35 @@ export function PackCard({
   isStarting = false,
 }: PackCardProps) {
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1">
-            <CardTitle className="text-xl flex items-center gap-2">
-              {pack.name}
-            </CardTitle>
-            {pack.description && (
-              <CardDescription className="line-clamp-2">
-                {pack.description}
-              </CardDescription>
-            )}
-            {pack.tags && pack.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {pack.tags.slice(0, 5).map((tag, index) => (
-                  <Badge key={index} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-                {pack.tags.length > 5 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{pack.tags.length - 5}
-                  </Badge>
-                )}
-              </div>
-            )}
-          </div>
-          <Badge variant="secondary" className="ml-2">
+    <Card className="hover:shadow-lg transition-shadow flex flex-col">
+      <CardHeader className="flex-1">
+        <div className="flex items-start justify-between mb-2">
+          <CardTitle className="text-xl flex items-center gap-2">
+            {pack.name}
+          </CardTitle>
+          <Badge variant="secondary" className="ml-2 shrink-0">
             {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
           </Badge>
         </div>
+        {pack.description && (
+          <CardDescription className="line-clamp-2">
+            {pack.description}
+          </CardDescription>
+        )}
+        {pack.tags && pack.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-3">
+            {pack.tags.slice(0, 5).map((tag, index) => (
+              <Badge key={index} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+            {pack.tags.length > 5 && (
+              <Badge variant="outline" className="text-xs">
+                +{pack.tags.length - 5}
+              </Badge>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-2">
         <Button

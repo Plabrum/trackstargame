@@ -1,8 +1,8 @@
 /**
- * Host Layout
+ * Host Game Layout
  *
- * Handles Spotify authentication and provides auth context.
- * Redirects to home if not authenticated.
+ * Adds Spotify authentication on top of the game session context.
+ * Host pages need Spotify auth for playback controls.
  */
 
 import { cookies } from 'next/headers';
@@ -42,7 +42,7 @@ async function getAuthenticatedUser(): Promise<{
   }
 }
 
-export default async function HostLayout({
+export default async function HostGameLayout({
   children,
 }: {
   children: React.ReactNode;
