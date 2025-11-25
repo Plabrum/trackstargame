@@ -37,6 +37,8 @@ export default function HostPage() {
             isStarting={game.isActionLoading('start_game')}
             isSpotifyReady={game.spotifyPlayer.isReady}
             spotifyError={game.spotifyPlayer.error}
+            onEndGame={() => game.executeAction({ type: 'end_game' })}
+            isEndingGame={game.isActionLoading('end_game')}
           />
         );
 

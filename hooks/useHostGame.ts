@@ -7,7 +7,7 @@
  * Throws if session fails to load - errors are shown via toast notifications.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGameSession, useGamePlayers, useGameRounds, useRoundAnswers, useTrack } from './queries/use-game';
 import {
   useStartGame,
@@ -33,25 +33,31 @@ export function useHostGame(sessionId: string) {
     pointsEarned: number;
   } | null>(null);
 
+  // Memoize the onError callback to prevent unnecessary re-initialization of the player
+  const handleSpotifyError = useCallback((error: string) => {
+    // Show different toast styles based on error type
+    if (error.includes('Premium Required')) {
+      toast.error('Spotify Premium Required', {
+        description: error,
+        duration: 10000, // Show longer for important errors
+      });
+    } else if (error.includes('Authentication failed')) {
+      toast.error('Session Expired', {
+        description: error,
+        duration: 8000,
+      });
+    } else {
+      toast.error('Spotify Player Error', {
+        description: error,
+      });
+    }
+  }, []);
+
   // Spotify player - errors shown via toast
   const spotifyPlayer = useSpotifyPlayer({
     accessToken,
     deviceName: 'Trackstar Game',
-    onReady: () => {
-      console.log('Spotify player ready');
-    },
-    onError: (error) => {
-      console.error('Spotify error:', error);
-      toast.error('Spotify Player Error', {
-        description: error,
-      });
-    },
-    onTrackEnd: () => {
-      console.log('Track ended naturally');
-    },
-    onPlaybackChange: (state) => {
-      console.log('Playback state:', state);
-    },
+    onError: handleSpotifyError,
   });
 
   // Fetch game data (session is provided by layout context, always non-null)

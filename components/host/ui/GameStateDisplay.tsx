@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TrackReveal } from "@/components/game/TrackReveal";
 import type { Tables } from "@/lib/types/database";
-import type { SpotifyPlayerState } from "@/lib/audio/spotify-player";
+import type { SpotifyPlayerState } from "@/hooks/useSpotifyPlayer";
 
 type Player = Tables<'players'>;
 type GameSession = Tables<'game_sessions'>;
@@ -53,7 +53,7 @@ export function GameStateDisplay({
       case 'playing':
         if (hasSubmittedAnswer) {
           return (
-            <Alert>
+            <Alert className="w-full">
               <AlertDescription className="text-center py-4">
                 <p className="text-xl font-bold">Answer submitted!</p>
                 <p className="text-sm text-muted-foreground mt-2">
@@ -67,7 +67,7 @@ export function GameStateDisplay({
 
       case 'buzzed':
         return (
-          <Alert className="border-yellow-500 bg-yellow-50">
+          <Alert className="w-full border-yellow-500 bg-yellow-50">
             <AlertDescription>
               <div className="text-center py-2">
                 <p className="text-2xl font-bold text-yellow-900">{buzzerPlayer?.name} buzzed!</p>
@@ -81,7 +81,7 @@ export function GameStateDisplay({
 
       case 'submitted':
         return (
-          <Alert className="border-blue-500 bg-blue-50">
+          <Alert className="w-full border-blue-500 bg-blue-50">
             <AlertDescription>
               <div className="text-center py-2">
                 <p className="text-xl font-bold text-blue-900">All answers submitted!</p>
@@ -113,7 +113,7 @@ export function GameStateDisplay({
         }
 
         return (
-          <Alert>
+          <Alert className="w-full">
             <AlertDescription className="text-center py-4">
               <p className="text-lg font-semibold">Round Complete</p>
               <p className="text-sm text-muted-foreground mt-2">Ready for next round</p>

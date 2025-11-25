@@ -19,7 +19,7 @@ import { SpotifyPlaybackControls } from "./SpotifyPlaybackControls";
 import { ActionButtonGroup } from "@/components/game/ActionButton";
 import { AnswerInputForm } from "@/components/shared/AnswerInputForm";
 import { Header } from "@/components/shared/Header";
-import { UserInfo } from "@/components/shared/UserInfo";
+import { UserDisplay, LogoutButton, EndGameButton } from "@/components/shared/UserInfo";
 import { GameStateDisplay } from "./ui/GameStateDisplay";
 import { PlayerScoreboard } from "./ui/PlayerScoreboard";
 import { AnswerReviewPanel } from "./ui/AnswerReviewPanel";
@@ -102,6 +102,14 @@ export function HostGameController({
     setVolume,
   } = spotifyPlayer;
 
+  // Store player functions in refs to avoid re-running effects when they change
+  const playRef = useRef(play);
+  const pauseRef = useRef(pause);
+  useEffect(() => {
+    playRef.current = play;
+    pauseRef.current = pause;
+  }, [play, pause]);
+
   // Detect solo mode
   const isSoloMode = players.length === 1 && players[0]?.is_host === true;
   const currentRoundNum = session.current_round || 0;
@@ -119,34 +127,37 @@ export function HostGameController({
 
   // Auto-play track when round starts
   useEffect(() => {
+    console.log('[HostGameController] Auto-play check:', {
+      state,
+      hasSpotifyId: !!currentTrack?.spotify_id,
+      isReady,
+      hasStartedPlaying: hasStartedPlayingRef.current
+    });
+
     if (
       state === 'playing' &&
       currentTrack?.spotify_id &&
       isReady &&
       !hasStartedPlayingRef.current
     ) {
-      console.log('[HostGameController] Auto-playing track:', currentTrack.spotify_id);
-      play(currentTrack.spotify_id)
+      console.log('[HostGameController] Starting playback:', currentTrack.spotify_id);
+      playRef.current(currentTrack.spotify_id)
         .then(() => {
-          console.log('[HostGameController] Track started playing successfully');
+          console.log('[HostGameController] Playback started successfully');
           hasStartedPlayingRef.current = true;
         })
         .catch((err) => {
           console.error('[HostGameController] Failed to auto-play:', err);
         });
     }
-  }, [state, currentTrack?.spotify_id, isReady, play]);
+  }, [state, currentTrack?.spotify_id, isReady]);
 
   // Auto-pause when someone buzzes
   useEffect(() => {
     if (state === 'buzzed' && isPlaying) {
-      pause().catch((err) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to pause:', err);
-        }
-      });
+      pauseRef.current().catch(() => { });
     }
-  }, [state, isPlaying, pause]);
+  }, [state, isPlaying]);
 
   // Reset playing flag when state changes away from playing or when round changes
   useEffect(() => {
@@ -189,12 +200,17 @@ export function HostGameController({
           title={`Round ${currentRoundNum} / ${totalRounds}`}
           rightContent={
             <>
-              <UserInfo />
+              <UserDisplay />
               <Badge variant="secondary" className="text-md px-3 py-2">
                 {isSoloMode ? 'Solo Mode' : 'Party Mode'}
                 {session.enable_text_input_mode && ' + Text Input'}
                 {soloMode && ' | Host Player'}
               </Badge>
+              <EndGameButton
+                onEndGame={() => executeAction({ type: 'end_game' })}
+                isLoading={isActionLoading('end_game')}
+              />
+              <LogoutButton />
             </>
           }
         />
@@ -204,28 +220,24 @@ export function HostGameController({
           <div className="md:col-span-2 space-y-6">
             {/* Round Control */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 justify-between">
-                  <GameStateDisplay
-                    state={state}
-                    buzzerPlayer={buzzerPlayer}
-                    elapsedSeconds={elapsedSeconds}
-                    currentTrack={currentTrack}
-                    playbackState={playbackState}
-                    answerFeedback={
-                      soloMode?.answerFeedback
-                        ? {
-                          isCorrect: soloMode.answerFeedback.isCorrect,
-                          pointsEarned: soloMode.answerFeedback.pointsEarned,
-                        }
-                        : undefined
-                    }
-                    isSoloMode={isSoloMode}
-                    hasSubmittedAnswer={soloMode?.hasSubmitted}
-                  />
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
+                <GameStateDisplay
+                  state={state}
+                  buzzerPlayer={buzzerPlayer}
+                  elapsedSeconds={elapsedSeconds}
+                  currentTrack={currentTrack}
+                  playbackState={playbackState}
+                  answerFeedback={
+                    soloMode?.answerFeedback
+                      ? {
+                        isCorrect: soloMode.answerFeedback.isCorrect,
+                        pointsEarned: soloMode.answerFeedback.pointsEarned,
+                      }
+                      : undefined
+                  }
+                  isSoloMode={isSoloMode}
+                  hasSubmittedAnswer={soloMode?.hasSubmitted}
+                />
                 {/* Host Text Input (Solo or Party Mode) */}
                 {state === 'playing' &&
                   soloMode &&
@@ -288,6 +300,16 @@ export function HostGameController({
           </div>
         </div>
       </div>
+
+      {/* Debug Info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-4 left-4 bg-black text-white p-2 text-xs z-50">
+          <div>isReady: {String(isReady)}</div>
+          <div>hasTrack: {String(!!playbackState?.track)}</div>
+          <div>isPlaying: {String(isPlaying)}</div>
+          <div>error: {spotifyError || 'none'}</div>
+        </div>
+      )}
 
       {/* Spotify Playback Controls - Sticky Bottom */}
       {isReady && playbackState?.track && (

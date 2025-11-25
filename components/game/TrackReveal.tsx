@@ -34,7 +34,7 @@ export function TrackReveal({
     : "text-gray-900";
 
   return (
-    <Alert className={`border-2 ${borderColor}`}>
+    <Alert className={`w-full border-2 ${borderColor}`}>
       <AlertDescription>
         <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 py-4">
           {/* Album Art */}

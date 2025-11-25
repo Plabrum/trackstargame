@@ -43,28 +43,18 @@ export function Header({ title, rightContent }: HeaderProps) {
       </div>
 
       {hasContent && (
-        <>
-          {/* Desktop version - show all items inline */}
-          <div className="hidden sm:flex items-center gap-3">
-            {rightContent}
-          </div>
-
-          {/* Mobile version - show popover menu */}
-          <div className="sm:hidden">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="p-2">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56" align="end">
-                <div className="flex flex-col gap-3">
-                  {rightContent}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="p-2">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56" align="end">
+            <div className="flex flex-col gap-3">
+              {rightContent}
+            </div>
+          </PopoverContent>
+        </Popover>
       )}
     </div>
   );

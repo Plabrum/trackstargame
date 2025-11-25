@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { GameSettingsForm } from "@/components/host/GameSettingsForm";
 import { PlayerList } from "@/components/shared/PlayerList";
 import { Header } from "@/components/shared/Header";
-import { UserInfo } from "@/components/shared/UserInfo";
+import { UserDisplay, LogoutButton, EndGameButton } from "@/components/shared/UserInfo";
 import { useUpdateSettings } from "@/hooks/mutations/use-game-mutations";
 import type { Tables } from "@/lib/types/database";
 
@@ -30,9 +30,11 @@ interface HostLobbyProps {
   isStarting: boolean;
   isSpotifyReady: boolean;
   spotifyError: string | null;
+  onEndGame: () => void;
+  isEndingGame: boolean;
 }
 
-export function HostLobby({ session, players, onStartGame, isStarting, isSpotifyReady, spotifyError }: HostLobbyProps) {
+export function HostLobby({ session, players, onStartGame, isStarting, isSpotifyReady, spotifyError, onEndGame, isEndingGame }: HostLobbyProps) {
   const sessionId = session.id;
   const hostName = session.host_name;
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/play/${sessionId}` : "";
@@ -78,7 +80,19 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <Header title="Game Lobby" rightContent={<UserInfo />} />
+      <Header
+        title="Game Lobby"
+        rightContent={
+          <>
+            <UserDisplay />
+            <EndGameButton
+              onEndGame={onEndGame}
+              isLoading={isEndingGame}
+            />
+            <LogoutButton />
+          </>
+        }
+      />
 
       {/* Game Mode & Settings - Always Visible */}
       <GameSettingsForm

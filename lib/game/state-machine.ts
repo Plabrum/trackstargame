@@ -258,15 +258,6 @@ export function getAvailableActions(
           enabled: true,
           variant: 'secondary',
         });
-
-        // End game early action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'Cancel Game',
-          description: 'End the game without starting',
-          enabled: true,
-          variant: 'danger',
-        });
         break;
 
       case 'playing':
@@ -277,15 +268,6 @@ export function getAvailableActions(
           description: 'Show answer if time expires or no one buzzes',
           enabled: true,
           variant: 'secondary',
-        });
-
-        // End game action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'End Game',
-          description: 'Stop the game early',
-          enabled: true,
-          variant: 'danger',
         });
         break;
 
@@ -307,15 +289,6 @@ export function getAvailableActions(
           enabled: true,
           variant: 'danger',
         });
-
-        // End game action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'End Game',
-          description: 'Stop the game early',
-          enabled: true,
-          variant: 'danger',
-        });
         break;
 
       case 'submitted':
@@ -329,15 +302,6 @@ export function getAvailableActions(
             ? undefined
             : 'Waiting for all players to submit',
           variant: 'primary',
-        });
-
-        // End game action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'End Game',
-          description: 'Stop the game early',
-          enabled: true,
-          variant: 'danger',
         });
         break;
 
