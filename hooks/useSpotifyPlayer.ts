@@ -258,23 +258,21 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
       let activeDeviceId: string | undefined;
       try {
         const playbackState = await api.player.getPlaybackState();
-        activeDeviceId = playbackState?.device?.id;
+        activeDeviceId = playbackState?.device?.id ?? undefined;
         console.log('[Spotify] Current active device:', activeDeviceId, 'Our device:', deviceIdRef.current);
       } catch (err) {
         console.log('[Spotify] Could not get playback state, will attempt playback anyway:', err);
       }
 
-      // Always specify our device_id unless we're already the active device
-      // This ensures playback targets our Web Playback SDK instance
+      // Always specify our device_id to ensure playback targets our Web Playback SDK instance
       const isAlreadyActiveDevice = activeDeviceId === deviceIdRef.current;
-      const targetDevice = isAlreadyActiveDevice ? undefined : deviceIdRef.current;
 
       console.log('[Spotify] Playing track:', {
         uri,
         activeDeviceId,
         ourDevice: deviceIdRef.current,
         isAlreadyActiveDevice,
-        targetDevice
+        targetDevice: deviceIdRef.current
       });
 
       // Retry logic for "Device not found" 404 errors
@@ -285,7 +283,7 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           await api.player.startResumePlayback(
-            targetDevice,
+            deviceIdRef.current,
             undefined,
             [uri],
             undefined,
