@@ -1,35 +1,59 @@
 /**
  * Host Layout
  *
- * Ensures user is authenticated with Spotify before accessing any host pages.
- * Redirects to home if not authenticated (with error details).
- * Provides unified Spotify auth context with guaranteed non-null user data.
+ * Handles Spotify authentication and provides auth context.
+ * Redirects to home if not authenticated.
  */
 
-import { redirect } from "next/navigation";
-import { getAuthenticatedUser } from "@/lib/spotify-auth-actions";
-import { SpotifyAuthProvider } from "@/lib/spotify-auth-context";
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { SpotifyAuthProvider, type SpotifyUser } from '@/lib/spotify-auth-context';
+
+async function getAuthenticatedUser(): Promise<{
+  user: SpotifyUser | null;
+  accessToken: string | null;
+}> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get('spotify_access_token')?.value;
+
+  if (!accessToken) {
+    return { user: null, accessToken: null };
+  }
+
+  try {
+    // Fetch user profile from Spotify API
+    const response = await fetch('https://api.spotify.com/v1/me', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch Spotify user profile');
+      return { user: null, accessToken: null };
+    }
+
+    const user = await response.json();
+    return { user, accessToken };
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return { user: null, accessToken: null };
+  }
+}
 
 export default async function HostLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, accessToken, error } = await getAuthenticatedUser();
+  const { user, accessToken } = await getAuthenticatedUser();
 
-  // Redirect if not authenticated - provider requires non-null user
+  // Redirect to home if not authenticated
   if (!user || !accessToken) {
-    console.log('[HostLayout] User not authenticated, redirecting to home', { error });
-
-    // Add error parameter if there was an auth error
-    if (error) {
-      redirect(`/?error=${error}`);
-    }
-
-    redirect('/');
+    redirect('/?error=not_authenticated');
   }
 
-  // User and accessToken are guaranteed to be non-null here
   return (
     <SpotifyAuthProvider user={user} accessToken={accessToken}>
       {children}

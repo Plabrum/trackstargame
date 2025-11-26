@@ -76,3 +76,62 @@ export async function refreshSpotifyToken(refreshToken: string) {
 
   return response.json();
 }
+
+/**
+ * Cookie store interface compatible with both Next.js cookies() and NextResponse.cookies
+ */
+interface CookieStore {
+  set(name: string, value: string, options?: {
+    httpOnly?: boolean;
+    secure?: boolean;
+    sameSite?: 'lax' | 'strict' | 'none';
+    maxAge?: number;
+  }): void;
+}
+
+/**
+ * Spotify token response structure
+ */
+export interface SpotifyTokens {
+  access_token: string;
+  expires_in: number;
+  refresh_token?: string;
+}
+
+/**
+ * Set Spotify authentication cookies with standardized configuration
+ * Works with both server-side cookies() and middleware NextResponse.cookies
+ *
+ * @param tokens - Spotify tokens from OAuth flow or refresh
+ * @param cookieStore - Cookie store (from cookies() or NextResponse.cookies)
+ */
+export function setSpotifyTokenCookies(tokens: SpotifyTokens, cookieStore: CookieStore): void {
+  // Calculate expiration timestamp
+  const expiresAtTimestamp = Date.now() + tokens.expires_in * 1000;
+
+  // Set access token
+  cookieStore.set('spotify_access_token', tokens.access_token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: tokens.expires_in,
+  });
+
+  // Set expiration timestamp
+  cookieStore.set('spotify_token_expires_at', expiresAtTimestamp.toString(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: tokens.expires_in,
+  });
+
+  // Set refresh token (if provided)
+  if (tokens.refresh_token) {
+    cookieStore.set('spotify_refresh_token', tokens.refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+  }
+}

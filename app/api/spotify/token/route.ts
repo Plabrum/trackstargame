@@ -4,10 +4,10 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getAccessToken } from '@/lib/spotify-auth-actions';
+import { getValidToken } from '@/lib/spotify-auth-actions';
 
 export async function GET() {
-  const { accessToken, error } = await getAccessToken();
+  const { accessToken, error } = await getValidToken();
 
   if (!accessToken || error) {
     return NextResponse.json(

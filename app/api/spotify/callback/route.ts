@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSpotifyTokens } from '@/lib/spotify-auth';
+import { getSpotifyTokens, setSpotifyTokenCookies } from '@/lib/spotify-auth';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -31,31 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Store tokens in secure HTTP-only cookies
     const cookieStore = await cookies();
-
-    // Calculate expiration timestamp
-    const expiresAtTimestamp = Date.now() + tokens.expires_in * 1000;
-
-    cookieStore.set('spotify_access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: tokens.expires_in,
-    });
-
-    // Store the expiration timestamp
-    cookieStore.set('spotify_token_expires_at', expiresAtTimestamp.toString(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: tokens.expires_in,
-    });
-
-    cookieStore.set('spotify_refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-    });
+    setSpotifyTokenCookies(tokens, cookieStore);
 
     console.log('[Spotify Callback] Cookies set, redirecting to select pack page');
 

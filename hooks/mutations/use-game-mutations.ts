@@ -418,6 +418,49 @@ export function useUpdateSettings() {
   });
 }
 
+/**
+ * Reset game with new pack (Play Again functionality)
+ * Uses RPC function for complex multi-table reset
+ */
+export function useResetGame() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      sessionId: string;
+      newPackId: string
+    }) => {
+      const { data, error } = await supabase
+        .rpc('reset_game', {
+          p_session_id: params.sessionId,
+          p_new_pack_id: params.newPackId,
+        })
+        .single();
+
+      if (error) throw error;
+      return data as RPCFunction<'reset_game'>;
+    },
+    onSuccess: async (data, variables) => {
+      // Invalidate all session-related queries for clean slate
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['sessions', variables.sessionId]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['sessions', variables.sessionId, 'players']
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['sessions', variables.sessionId, 'rounds']
+        }),
+      ]);
+    },
+    onError: (error: Error) => {
+      throw new Error(translateDBError(error));
+    },
+  });
+}
+
 // Legacy exports for backward compatibility during migration
 export const useNextRound = useAdvanceRound;
 export const useRevealTrack = useRevealAnswer;

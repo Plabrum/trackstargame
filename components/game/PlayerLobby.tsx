@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { PlayerList } from "@/components/shared/PlayerList";
 import { Header } from "@/components/shared/Header";
+import { useJoinSession } from "@/hooks/mutations/use-game-mutations";
+import { toast } from "sonner";
 import type { Tables } from "@/lib/types/database";
 
 type Player = Tables<'players'>;
@@ -19,9 +20,7 @@ interface PlayerLobbyProps {
   hostName: string;
   players: Player[];
   currentPlayerId?: string | null;
-  onJoin: (playerName: string) => void;
-  isJoining: boolean;
-  joinError?: Error | null;
+  onPlayerJoined: (playerId: string) => void;
 }
 
 export function PlayerLobby({
@@ -29,16 +28,29 @@ export function PlayerLobby({
   hostName,
   players,
   currentPlayerId,
-  onJoin,
-  isJoining,
-  joinError,
+  onPlayerJoined,
 }: PlayerLobbyProps) {
   const [playerName, setPlayerName] = useState("");
   const hasJoined = !!currentPlayerId;
 
+  const joinSession = useJoinSession();
+
   const handleJoin = () => {
     if (!playerName.trim()) return;
-    onJoin(playerName.trim());
+
+    joinSession.mutate(
+      { sessionId, playerName: playerName.trim() },
+      {
+        onSuccess: (player) => {
+          onPlayerJoined(player.id);
+        },
+        onError: (error) => {
+          toast.error("Failed to join", {
+            description: error.message,
+          });
+        },
+      }
+    );
   };
 
   return (
@@ -72,7 +84,7 @@ export function PlayerLobby({
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && playerName.trim() && !isJoining) {
+                  if (e.key === "Enter" && playerName.trim() && !joinSession.isPending) {
                     handleJoin();
                   }
                 }}
@@ -81,21 +93,14 @@ export function PlayerLobby({
               />
             </div>
 
-            {joinError && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {joinError.message || "Failed to join game"}
-                </AlertDescription>
-              </Alert>
-            )}
 
             <Button
               className="w-full"
               size="lg"
               onClick={handleJoin}
-              disabled={!playerName.trim() || isJoining}
+              disabled={!playerName.trim() || joinSession.isPending}
             >
-              {isJoining ? (
+              {joinSession.isPending ? (
                 <>
                   <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Joining...

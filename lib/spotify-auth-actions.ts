@@ -25,23 +25,13 @@ export interface SpotifyUser {
  * Get the access token from cookies
  * Middleware ensures it's always fresh, so we just read it
  */
-async function getValidToken(): Promise<{
+export async function getValidToken(): Promise<{
   accessToken: string | null;
   error?: string;
 }> {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get('spotify_access_token')?.value;
   const refreshToken = cookieStore.get('spotify_refresh_token')?.value;
-
-  console.log('[getValidToken] Checking tokens:', {
-    hasAccessToken: !!accessToken,
-    hasRefreshToken: !!refreshToken,
-  });
-
-  // No tokens at all
-  if (!accessToken && !refreshToken) {
-    return { accessToken: null, error: 'not_authenticated' };
-  }
 
   // Have access token (middleware ensures it's fresh)
   if (accessToken) {
@@ -53,6 +43,7 @@ async function getValidToken(): Promise<{
     return { accessToken: null, error: 'refresh_failed' };
   }
 
+  // No tokens at all
   return { accessToken: null, error: 'not_authenticated' };
 }
 
@@ -129,16 +120,4 @@ export async function clearSpotifyAuth() {
   const cookieStore = await cookies();
   cookieStore.delete('spotify_access_token');
   cookieStore.delete('spotify_refresh_token');
-}
-
-/**
- * Get access token for client-side use (e.g., Web Playback SDK)
- * Middleware ensures it's fresh
- */
-export async function getAccessToken(): Promise<{
-  accessToken: string | null;
-  error?: string;
-}> {
-  // Use shared token validation logic
-  return getValidToken();
 }

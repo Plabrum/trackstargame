@@ -7,7 +7,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, XCircle } from "lucide-react";
 import { useSpotifyAuth } from "@/lib/spotify-auth-context";
 
 export function UserDisplay() {
@@ -44,11 +44,22 @@ export function LogoutButton() {
   );
 }
 
-export function UserInfo() {
+interface EndGameButtonProps {
+  onEndGame: () => void;
+  isLoading?: boolean;
+}
+
+export function EndGameButton({ onEndGame, isLoading }: EndGameButtonProps) {
   return (
-    <>
-      <UserDisplay />
-      <LogoutButton />
-    </>
+    <Button
+      onClick={onEndGame}
+      variant="destructive"
+      size="sm"
+      className="w-full sm:w-auto"
+      disabled={isLoading}
+    >
+      <XCircle className="h-4 w-4 mr-2" />
+      {isLoading ? 'Ending...' : 'End Game'}
+    </Button>
   );
 }

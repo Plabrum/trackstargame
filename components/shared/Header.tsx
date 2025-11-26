@@ -8,6 +8,7 @@
 'use client';
 
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Children } from "react";
 import { Button } from "@/components/ui/button";
@@ -30,41 +31,33 @@ export function Header({ title, rightContent }: HeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <Image
-          src="/small_logo.svg"
-          alt="Trackstar"
-          width={48}
-          height={48}
-          className="w-12 h-12"
-        />
+        <Link href="/host" className="flex-shrink-0 hover:opacity-80 transition-opacity">
+          <Image
+            src="/small_logo.svg"
+            alt="Trackstar"
+            width={48}
+            height={48}
+            className="w-12 h-12"
+          />
+        </Link>
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
           {title}
         </h1>
       </div>
 
       {hasContent && (
-        <>
-          {/* Desktop version - show all items inline */}
-          <div className="hidden sm:flex items-center gap-3">
-            {rightContent}
-          </div>
-
-          {/* Mobile version - show popover menu */}
-          <div className="sm:hidden">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="p-2">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56" align="end">
-                <div className="flex flex-col gap-3">
-                  {rightContent}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="p-2">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56" align="end">
+            <div className="flex flex-col gap-3">
+              {rightContent}
+            </div>
+          </PopoverContent>
+        </Popover>
       )}
     </div>
   );

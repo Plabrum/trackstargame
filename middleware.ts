@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { refreshSpotifyToken } from './lib/spotify-auth';
+import { refreshSpotifyToken, setSpotifyTokenCookies } from './lib/spotify-auth';
 
 /**
  * Refresh buffer to avoid edge cases where token expires during request
@@ -38,33 +38,7 @@ export async function middleware(request: NextRequest) {
 
       // Create response and set new cookies
       const response = NextResponse.next();
-
-      // Calculate expiration timestamp
-      const expiresAtTimestamp = Date.now() + tokens.expires_in * 1000;
-
-      response.cookies.set('spotify_access_token', tokens.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: tokens.expires_in,
-      });
-
-      // Store the expiration timestamp
-      response.cookies.set('spotify_token_expires_at', expiresAtTimestamp.toString(), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: tokens.expires_in,
-      });
-
-      if (tokens.refresh_token) {
-        response.cookies.set('spotify_refresh_token', tokens.refresh_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30, // 30 days
-        });
-      }
+      setSpotifyTokenCookies(tokens, response.cookies);
 
       console.log('[Middleware] Token refreshed successfully');
       return response;

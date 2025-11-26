@@ -10,18 +10,17 @@ export type GameState = 'lobby' | 'playing' | 'buzzed' | 'submitted' | 'reveal' 
 // User roles
 export type Role = 'host' | 'player';
 
-// Host actions
-export type HostAction =
+// All possible game actions (state machine decides which are available based on role/state)
+export type GameAction =
+  // Host actions
   | { type: 'start_game' }
   | { type: 'judge_answer'; correct: boolean }
   | { type: 'finalize_judgments'; overrides?: Record<string, boolean> }
   | { type: 'advance_round' }
   | { type: 'end_game' }
   | { type: 'update_settings'; settings: GameSettings }
-  | { type: 'reveal_answer' }; // For timeout case (no buzz)
-
-// Player actions
-export type PlayerAction =
+  | { type: 'reveal_answer' }
+  // Player actions
   | { type: 'join_session'; playerName: string }
   | { type: 'buzz' }
   | { type: 'submit_answer'; answer: string };
@@ -34,7 +33,7 @@ export type GameSettings = {
 };
 
 // Action descriptor with metadata for UI rendering
-export type ActionDescriptor<T = HostAction | PlayerAction> = {
+export type ActionDescriptor<T = GameAction> = {
   action: T;
   label: string;
   description: string;
@@ -73,7 +72,7 @@ const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
   buzzed: ['reveal', 'finished'], // host judges or ends game
   submitted: ['reveal', 'finished'], // host finalizes judgments or ends game
   reveal: ['playing', 'finished'], // next round starts, finished if game over
-  finished: [], // Terminal state
+  finished: ['playing'], // Allow restart with new pack
 };
 
 /**
@@ -259,15 +258,6 @@ export function getAvailableActions(
           enabled: true,
           variant: 'secondary',
         });
-
-        // End game early action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'Cancel Game',
-          description: 'End the game without starting',
-          enabled: true,
-          variant: 'danger',
-        });
         break;
 
       case 'playing':
@@ -278,15 +268,6 @@ export function getAvailableActions(
           description: 'Show answer if time expires or no one buzzes',
           enabled: true,
           variant: 'secondary',
-        });
-
-        // End game action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'End Game',
-          description: 'Stop the game early',
-          enabled: true,
-          variant: 'danger',
         });
         break;
 
@@ -308,15 +289,6 @@ export function getAvailableActions(
           enabled: true,
           variant: 'danger',
         });
-
-        // End game action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'End Game',
-          description: 'Stop the game early',
-          enabled: true,
-          variant: 'danger',
-        });
         break;
 
       case 'submitted':
@@ -330,15 +302,6 @@ export function getAvailableActions(
             ? undefined
             : 'Waiting for all players to submit',
           variant: 'primary',
-        });
-
-        // End game action
-        actions.push({
-          action: { type: 'end_game' },
-          label: 'End Game',
-          description: 'Stop the game early',
-          enabled: true,
-          variant: 'danger',
         });
         break;
 

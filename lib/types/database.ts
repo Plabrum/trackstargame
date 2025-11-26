@@ -17,10 +17,10 @@ export type Database = {
     Functions: {
       graphql: {
         Args: {
+          extensions?: Json
           operationName?: string
           query?: string
           variables?: Json
-          extensions?: Json
         }
         Returns: Json
       }
@@ -105,7 +105,7 @@ export type Database = {
           id: string
           pack_id: string | null
           round_start_time: string | null
-          state: string | null
+          state: string
           total_rounds: number
           updated_at: string | null
         }
@@ -118,7 +118,7 @@ export type Database = {
           id?: string
           pack_id?: string | null
           round_start_time?: string | null
-          state?: string | null
+          state?: string
           total_rounds?: number
           updated_at?: string | null
         }
@@ -131,7 +131,7 @@ export type Database = {
           id?: string
           pack_id?: string | null
           round_start_time?: string | null
-          state?: string | null
+          state?: string
           total_rounds?: number
           updated_at?: string | null
         }
@@ -254,26 +254,38 @@ export type Database = {
       }
       tracks: {
         Row: {
+          album_name: string | null
           artist: string
           created_at: string | null
+          genres: string[] | null
           id: string
           pack_id: string | null
+          primary_genre: string | null
+          release_year: number | null
           spotify_id: string
           title: string
         }
         Insert: {
+          album_name?: string | null
           artist: string
           created_at?: string | null
+          genres?: string[] | null
           id?: string
           pack_id?: string | null
+          primary_genre?: string | null
+          release_year?: number | null
           spotify_id: string
           title: string
         }
         Update: {
+          album_name?: string | null
           artist?: string
           created_at?: string | null
+          genres?: string[] | null
           id?: string
           pack_id?: string | null
+          primary_genre?: string | null
+          release_year?: number | null
           spotify_id?: string
           title?: string
         }
@@ -293,68 +305,64 @@ export type Database = {
     }
     Functions: {
       advance_round: {
-        Args: {
-          p_session_id: string
-        }
+        Args: { p_session_id: string }
         Returns: {
-          session_id: string
-          new_state: string
           new_round: number
+          new_state: string
+          session_id: string
           track_id: string
         }[]
       }
       finalize_judgments: {
-        Args: {
-          p_session_id: string
-          p_overrides?: Json
-        }
+        Args: { p_overrides?: Json; p_session_id: string }
         Returns: {
-          success: boolean
           leaderboard: Json
+          success: boolean
         }[]
       }
       increment_player_score: {
-        Args: {
-          player_id: string
-          points: number
-        }
+        Args: { player_id: string; points: number }
         Returns: undefined
       }
       judge_answer: {
-        Args: {
-          p_session_id: string
-          p_correct: boolean
-        }
+        Args: { p_correct: boolean; p_session_id: string }
         Returns: {
-          round_id: string
           buzzer_player_id: string
           correct: boolean
-          points_awarded: number
           new_player_score: number
+          points_awarded: number
+          round_id: string
+        }[]
+      }
+      reset_game: {
+        Args: { p_new_pack_id: string; p_session_id: string }
+        Returns: {
+          first_round: number
+          first_track_id: string
+          new_state: string
+          session_id: string
         }[]
       }
       start_game: {
-        Args: {
-          p_session_id: string
-        }
+        Args: { p_session_id: string }
         Returns: {
-          id: string
-          state: string
           current_round: number
           first_track_id: string
+          id: string
+          state: string
         }[]
       }
       submit_answer: {
         Args: {
-          p_session_id: string
-          p_player_id: string
           p_answer: string
           p_auto_validated: boolean
+          p_player_id: string
           p_points_awarded: number
+          p_session_id: string
         }
         Returns: {
-          answer_id: string
           all_players_submitted: boolean
+          answer_id: string
         }[]
       }
     }
@@ -367,27 +375,33 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -395,20 +409,24 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -416,20 +434,24 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -437,15 +459,45 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {},
+  },
+} as const
 

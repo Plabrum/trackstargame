@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Header } from "@/components/shared/Header";
-import { UserInfo } from "@/components/shared/UserInfo";
+import { UserDisplay, LogoutButton } from "@/components/shared/UserInfo";
 import { SoloGameStats } from "./SoloGameStats";
 import { ShareButton } from "./ShareButton";
 import { ShareableScoreCard } from "./ShareableScoreCard";
@@ -29,9 +29,17 @@ export function SoloFinalScore({ player, rounds, onPlayAgain, albumArtUrl }: Sol
   const accuracy = totalRounds > 0 ? Math.round((correctAnswers / totalRounds) * 100) : 0;
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="container mx-auto p-6 max-w-4xl space-y-6 pb-32">
       {/* Header */}
-      <Header title="Game Over" rightContent={<UserInfo />} />
+      <Header
+        title="Game Over"
+        rightContent={
+          <>
+            <UserDisplay />
+            <LogoutButton />
+          </>
+        }
+      />
 
       {/* Regular Stats Display */}
       <SoloGameStats rounds={rounds} finalScore={player.score ?? 0} />

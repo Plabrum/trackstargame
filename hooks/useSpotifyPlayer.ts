@@ -1,27 +1,41 @@
 /**
- * React hook for Spotify Web Playback SDK integration.
+ * React hook for Spotify Web Playback SDK.
+ * Uses official @spotify/web-api-ts-sdk for API calls.
  *
- * Provides host audio controls with precise timing for buzz mechanics.
+ * Note: Spotify SDK is loaded globally via Next.js Script component in app/layout.tsx
+ * Implementation follows Spotify's best practices:
+ * https://developer.spotify.com/documentation/web-playback-sdk/reference
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  SpotifyPlayer,
-  SpotifyPlayerState,
-  SpotifyPlayerCallbacks,
-} from '@/lib/audio/spotify-player';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { SpotifyApi } from '@spotify/web-api-ts-sdk';
+
+export interface SpotifyTrackMetadata {
+  uri: string;
+  id: string;
+  name: string;
+  artists: string;
+  albumName: string;
+  albumArt: string | null;
+}
+
+export interface SpotifyPlayerState {
+  isReady: boolean;
+  isPlaying: boolean;
+  isPaused: boolean;
+  position: number;
+  duration: number;
+  trackUri: string | null;
+  track: SpotifyTrackMetadata | null;
+}
 
 interface UseSpotifyPlayerOptions {
   accessToken: string;
   deviceName?: string;
-  onReady?: () => void;
   onError?: (error: string) => void;
-  onTrackEnd?: () => void;
-  onPlaybackChange?: (state: SpotifyPlayerState) => void;
 }
 
 export interface UseSpotifyPlayerReturn {
-  player: SpotifyPlayer | null;
   isReady: boolean;
   isPlaying: boolean;
   playbackState: SpotifyPlayerState | null;
@@ -29,164 +43,319 @@ export interface UseSpotifyPlayerReturn {
   play: (spotifyId: string) => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
-  stop: () => Promise<void>;
-  getElapsedSeconds: () => number;
   setVolume: (volume: number) => Promise<void>;
+  getElapsedSeconds: () => number;
 }
 
-export function useSpotifyPlayer(
-  options: UseSpotifyPlayerOptions
-): UseSpotifyPlayerReturn {
+export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPlayerReturn {
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackState, setPlaybackState] = useState<SpotifyPlayerState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const playerRef = useRef<SpotifyPlayer | null>(null);
+  const [sdkLoaded, setSdkLoaded] = useState(false);
 
-  // Initialize player
+  const deviceIdRef = useRef<string | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const playerRef = useRef<Spotify.Player | null>(null);
+  const stateChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Create API client - memoized so it doesn't recreate on every render
+  const api = useMemo(
+    () => SpotifyApi.withAccessToken(
+      process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || '',
+      { access_token: options.accessToken } as any
+    ),
+    [options.accessToken]
+  );
+
+  // useEffect only for player initialization, event listeners, and cleanup
   useEffect(() => {
-    // Don't show error if token hasn't been fetched yet (empty string)
     if (!options.accessToken) {
-      console.log('[useSpotifyPlayer] Waiting for access token...');
+      console.log('[Spotify] No access token');
       return;
     }
 
-    console.log('[useSpotifyPlayer] Initializing Spotify player...');
+    // Wait for SDK to be available
+    if (!window.Spotify) {
+      console.log('[Spotify] SDK not yet loaded, waiting...');
 
-    const callbacks: SpotifyPlayerCallbacks = {
-      onReady: () => {
-        console.log('[useSpotifyPlayer] Player Ready');
+      // Poll for SDK availability
+      const checkInterval = setInterval(() => {
+        if (window.Spotify) {
+          console.log('[Spotify] SDK now available');
+          clearInterval(checkInterval);
+          setSdkLoaded(true); // Trigger re-render
+        }
+      }, 100);
+
+      return () => clearInterval(checkInterval);
+    }
+
+    // If player already exists, don't reinitialize
+    if (playerRef.current) {
+      console.log('[Spotify] Player already initialized, skipping');
+      return;
+    }
+
+    console.log('[Spotify] Initializing player...');
+
+    // Create player instance
+    const player = new window.Spotify.Player({
+      name: options.deviceName || 'Trackstar Game',
+      getOAuthToken: (cb) => cb(options.accessToken),
+      volume: 0.8,
+    });
+
+    playerRef.current = player;
+    console.log('[Spotify] Player instance created');
+
+    // Essential: Device ready
+    // Device is ready but backend API needs time to recognize it
+    player.addListener('ready', async ({ device_id }) => {
+      console.log('[Spotify] Device ready event fired:', device_id);
+      deviceIdRef.current = device_id;
+
+      if (!api) {
+        console.error('[Spotify] API client not initialized');
         setIsReady(true);
         setError(null);
-        options.onReady?.();
-      },
-      onError: (err) => {
-        console.error('[useSpotifyPlayer] Player Error:', err);
-        setError(err);
-        options.onError?.(err);
-      },
-      onTrackEnd: () => {
-        console.log('[useSpotifyPlayer] Track Ended');
-        setIsPlaying(false);
-        options.onTrackEnd?.();
-      },
-      onPlaybackChange: (state) => {
-        setIsPlaying(state.isPlaying);
-        setPlaybackState(state);
-        options.onPlaybackChange?.(state);
-      },
-    };
+        return;
+      }
 
-    const player = new SpotifyPlayer(options.accessToken, callbacks);
-    playerRef.current = player;
+      // Wait for Spotify's backend to register the device
+      // This is a known issue with the Web Playback SDK
+      console.log('[Spotify] Waiting 0.5 seconds for backend to register device...');
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Initialize the player
-    player
-      .initialize(options.deviceName || 'Trackstar Game')
-      .catch((err) => {
-        console.error('[useSpotifyPlayer] Failed to initialize:', err);
-        setError(err.message);
+      try {
+        // Check current playback state
+        const playbackState = await api.player.getPlaybackState();
+
+        // If there's active playback on another device, transfer it
+        if (playbackState && playbackState.device.id !== device_id && playbackState.is_playing) {
+          console.log('[Spotify] Transferring active playback from', playbackState.device.name);
+          await api.player.transferPlayback([device_id], true); // true = keep playing
+        } else {
+          console.log('[Spotify] No active playback to transfer');
+        }
+      } catch (err) {
+        // Ignore errors - maybe no active playback, which is fine
+        console.log('[Spotify] Error checking playback state:', err);
+      }
+
+      console.log('[Spotify] Setting isReady to true');
+      setIsReady(true);
+      setError(null);
+    });
+
+    // Essential: Device disconnected
+    player.addListener('not_ready', ({ device_id }) => {
+      deviceIdRef.current = null;
+      setIsReady(false);
+    });
+
+    // Essential: Track playback state changes
+    // Debounce rapid state changes to avoid excessive re-renders
+    player.addListener('player_state_changed', (state) => {
+      if (!state) {
+        console.log('[Spotify] Player state changed: null');
+        return;
+      }
+
+      console.log('[Spotify] Player state changed:', {
+        paused: state.paused,
+        position: state.position,
+        track: state.track_window.current_track.name,
       });
 
-    // Cleanup on unmount
+      // Clear any pending state update
+      if (stateChangeTimeoutRef.current) {
+        clearTimeout(stateChangeTimeoutRef.current);
+      }
+
+      // Debounce state updates by 50ms to batch rapid events
+      stateChangeTimeoutRef.current = setTimeout(() => {
+        const currentTrack = state.track_window.current_track;
+        setIsPlaying(!state.paused);
+        setPlaybackState({
+          isReady: true,
+          isPlaying: !state.paused,
+          isPaused: state.paused,
+          position: state.position,
+          duration: state.duration,
+          trackUri: currentTrack.uri,
+          track: {
+            uri: currentTrack.uri,
+            id: currentTrack.id || '',
+            name: currentTrack.name,
+            artists: currentTrack.artists.map((a: { name: string }) => a.name).join(', '),
+            albumName: currentTrack.album.name || '',
+            albumArt: currentTrack.album.images[0]?.url ?? null,
+          },
+        });
+      }, 50);
+    });
+
+    // Error listeners - recommended by Spotify for proper diagnostics
+    player.addListener('initialization_error', ({ message }) => {
+      const msg = `Browser compatibility issue: ${message}`;
+      setError(msg);
+      options.onError?.(msg);
+    });
+
+    player.addListener('authentication_error', ({ message }) => {
+      const msg = `Authentication failed. Your session may have expired. Please refresh and sign in again.`;
+      setError(msg);
+      options.onError?.(msg);
+    });
+
+    player.addListener('account_error', ({ message }) => {
+      const msg = `Spotify Premium Required: This feature requires a Spotify Premium account. Please upgrade at spotify.com/premium to continue.`;
+      setError(msg);
+      options.onError?.(msg);
+    });
+
+    player.addListener('playback_error', ({ message }) => {
+      const msg = `Playback failed: ${message}`;
+      setError(msg);
+      options.onError?.(msg);
+    });
+
+    // Connect to the player
+    console.log('[Spotify] Connecting player...');
+    player.connect().then((connected) => {
+      if (!connected) {
+        console.error('[Spotify] Connection failed');
+        setError('Failed to connect to Spotify');
+        options.onError?.('Failed to connect to Spotify');
+      } else {
+        console.log('[Spotify] Connected successfully, waiting for ready event...');
+      }
+    }).catch((err) => {
+      console.error('[Spotify] Connection error:', err);
+      setError('Failed to connect to Spotify');
+      options.onError?.('Failed to connect to Spotify');
+    });
+
+    // Cleanup
     return () => {
-      console.log('[useSpotifyPlayer] Cleaning up - disconnecting player');
+      if (stateChangeTimeoutRef.current) {
+        clearTimeout(stateChangeTimeoutRef.current);
+      }
       player.disconnect();
-      playerRef.current = null;
     };
-  }, [options.accessToken]); // Only re-initialize if token changes
+  }, [options.accessToken, options.deviceName, options.onError, sdkLoaded]);
 
-  // Play track
-  const play = useCallback(async (spotifyId: string) => {
-    if (!playerRef.current) {
-      throw new Error('Player not initialized');
-    }
+  const play = useCallback(
+    async (spotifyId: string) => {
+      if (!deviceIdRef.current) {
+        throw new Error('Player not ready - device not activated');
+      }
 
-    try {
-      await playerRef.current.play(spotifyId);
-      setIsPlaying(true);
-      setError(null);
-    } catch (err: any) {
-      console.error('Failed to play track:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
+      const uri = spotifyId.startsWith('spotify:track:') ? spotifyId : `spotify:track:${spotifyId}`;
 
-  // Pause playback
+      // Check current playback state to see if we're already the active device
+      let activeDeviceId: string | undefined;
+      try {
+        const playbackState = await api.player.getPlaybackState();
+        activeDeviceId = playbackState?.device?.id;
+        console.log('[Spotify] Current active device:', activeDeviceId, 'Our device:', deviceIdRef.current);
+      } catch (err) {
+        console.log('[Spotify] Could not get playback state, will attempt playback anyway:', err);
+      }
+
+      // Always specify our device_id unless we're already the active device
+      // This ensures playback targets our Web Playback SDK instance
+      const isAlreadyActiveDevice = activeDeviceId === deviceIdRef.current;
+      const targetDevice = isAlreadyActiveDevice ? undefined : deviceIdRef.current;
+
+      console.log('[Spotify] Playing track:', {
+        uri,
+        activeDeviceId,
+        ourDevice: deviceIdRef.current,
+        isAlreadyActiveDevice,
+        targetDevice
+      });
+
+      // Retry logic for "Device not found" 404 errors
+      // This happens when the Spotify backend hasn't fully registered the device yet
+      const maxRetries = 3;
+      let lastError: Error | null = null;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await api.player.startResumePlayback(
+            targetDevice,
+            undefined,
+            [uri],
+            undefined,
+            0
+          );
+
+          // Success!
+          startTimeRef.current = Date.now();
+          setIsPlaying(true);
+          setError(null);
+          return;
+        } catch (err: any) {
+          lastError = err;
+
+          // Check if it's a 404 "Device not found" error
+          const is404 = err.message?.includes('404') || err.status === 404;
+
+          if (is404 && attempt < maxRetries - 1) {
+            // Wait before retrying (exponential backoff: 500ms, 1000ms, 2000ms)
+            const delay = 500 * Math.pow(2, attempt);
+            console.log(`[Spotify] Device not found (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+
+          // If it's not a 404 or we've exhausted retries, throw
+          break;
+        }
+      }
+
+      // If we get here, all retries failed
+      throw lastError || new Error('Failed to start playback');
+    },
+    [api]
+  );
+
   const pause = useCallback(async () => {
-    if (!playerRef.current) {
-      throw new Error('Player not initialized');
-    }
-
+    if (!deviceIdRef.current) return;
     try {
-      await playerRef.current.pause();
+      await api.player.pausePlayback(deviceIdRef.current);
       setIsPlaying(false);
     } catch (err: any) {
-      console.error('Failed to pause:', err);
-      setError(err.message);
-      throw err;
+      console.error('[Spotify] Pause error:', err);
+      // If it's a JSON parse error, the device might be stale - try to recover
+      if (err.message?.includes('JSON') || err.message?.includes('SyntaxError')) {
+        console.log('[Spotify] Possible stale device, attempting player pause directly');
+        await playerRef.current?.pause();
+        setIsPlaying(false);
+      } else {
+        throw err;
+      }
     }
-  }, []);
+  }, [api]);
 
-  // Resume playback
   const resume = useCallback(async () => {
-    if (!playerRef.current) {
-      throw new Error('Player not initialized');
-    }
+    if (!deviceIdRef.current) return;
+    await api.player.startResumePlayback(deviceIdRef.current);
+    setIsPlaying(true);
+  }, [api]);
 
-    try {
-      await playerRef.current.resume();
-      setIsPlaying(true);
-    } catch (err: any) {
-      console.error('Failed to resume:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // Stop playback
-  const stop = useCallback(async () => {
-    if (!playerRef.current) {
-      throw new Error('Player not initialized');
-    }
-
-    try {
-      await playerRef.current.stop();
-      setIsPlaying(false);
-    } catch (err: any) {
-      console.error('Failed to stop:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // Get elapsed seconds
-  const getElapsedSeconds = useCallback(() => {
-    if (!playerRef.current) {
-      return 0;
-    }
-
-    return playerRef.current.getElapsedSeconds();
-  }, []);
-
-  // Set volume
   const setVolume = useCallback(async (volume: number) => {
-    if (!playerRef.current) {
-      throw new Error('Player not initialized');
-    }
+    if (!deviceIdRef.current) return;
+    await api.player.setPlaybackVolume(Math.round(volume * 100), deviceIdRef.current);
+  }, [api]);
 
-    try {
-      await playerRef.current.setVolume(volume);
-    } catch (err: any) {
-      console.error('Failed to set volume:', err);
-      setError(err.message);
-      throw err;
-    }
+  const getElapsedSeconds = useCallback(() => {
+    return startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 0;
   }, []);
 
   return {
-    player: playerRef.current,
     isReady,
     isPlaying,
     playbackState,
@@ -194,8 +363,9 @@ export function useSpotifyPlayer(
     play,
     pause,
     resume,
-    stop,
-    getElapsedSeconds,
     setVolume,
+    getElapsedSeconds,
   };
 }
+
+// TypeScript declarations - augment the global types from @types/spotify-web-playback-sdk

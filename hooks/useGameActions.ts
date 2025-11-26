@@ -6,15 +6,13 @@
  */
 
 import { useMemo } from 'react';
-import {
-  getAvailableActions,
-  type GameContext,
-  type GameState,
-  type Role,
-  type ActionDescriptor,
-  type HostAction,
-  type PlayerAction,
-} from '@/lib/game/state-machine';
+import { getStateMachine } from '@/lib/game/state-machines';
+import type {
+  GameContext,
+  GameState,
+  Role,
+  ActionDescriptor,
+} from '@/lib/game/state-machines/base';
 import type { TableRow } from '@/lib/types/database-helpers';
 
 type GameSession = TableRow<'game_sessions'>;
@@ -45,7 +43,7 @@ export function useGameActions({
   currentRound,
   playerId,
   submittedAnswers = [],
-}: UseGameActionsOptions): ActionDescriptor<HostAction | PlayerAction>[] {
+}: UseGameActionsOptions): ActionDescriptor[] {
   return useMemo(() => {
     // If no session, return empty actions
     if (!session) return [];
@@ -78,8 +76,11 @@ export function useGameActions({
           : false,
     };
 
-    // Get actions from state machine
-    return getAvailableActions(context.state, role, context);
+    // Get the appropriate state machine for this game mode
+    const stateMachine = getStateMachine(session);
+
+    // Get actions from mode-specific state machine
+    return stateMachine.getAvailableActions(context.state, role, context);
   }, [
     role,
     session,
@@ -90,40 +91,3 @@ export function useGameActions({
   ]);
 }
 
-/**
- * Helper hook specifically for host actions
- */
-export function useHostActions(
-  session: GameSession | null | undefined,
-  players: Player[],
-  currentRound?: GameRound | null,
-  submittedAnswers?: RoundAnswer[]
-): ActionDescriptor<HostAction>[] {
-  return useGameActions({
-    role: 'host',
-    session,
-    players,
-    currentRound,
-    submittedAnswers,
-  }) as ActionDescriptor<HostAction>[];
-}
-
-/**
- * Helper hook specifically for player actions
- */
-export function usePlayerActions(
-  session: GameSession | null | undefined,
-  players: Player[],
-  playerId: string | undefined | null,
-  currentRound?: GameRound | null,
-  submittedAnswers?: RoundAnswer[]
-): ActionDescriptor<PlayerAction>[] {
-  return useGameActions({
-    role: 'player',
-    session,
-    players,
-    currentRound,
-    playerId: playerId ?? undefined,
-    submittedAnswers,
-  }) as ActionDescriptor<PlayerAction>[];
-}

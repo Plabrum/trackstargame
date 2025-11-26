@@ -9,11 +9,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { ActionDescriptor, HostAction, PlayerAction } from "@/lib/game/state-machine";
+import type { ActionDescriptor, GameAction } from "@/lib/game/state-machine";
 
 interface ActionButtonProps {
-  actionDescriptor: ActionDescriptor<HostAction | PlayerAction>;
-  onClick: (action: HostAction | PlayerAction) => void;
+  actionDescriptor: ActionDescriptor<GameAction>;
+  onClick: (action: GameAction) => void;
   isLoading?: boolean;
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
@@ -73,17 +73,19 @@ export function ActionButton({
  * ActionButtonGroup Component
  *
  * Renders a group of action buttons in a grid or flex layout.
+ * Supports custom renderers for specific action types.
  */
 
 interface ActionButtonGroupProps {
-  actions: ActionDescriptor<HostAction | PlayerAction>[];
-  onAction: (action: HostAction | PlayerAction) => void;
+  actions: ActionDescriptor<GameAction>[];
+  onAction: (action: GameAction) => void;
   loadingAction?: string; // The action type currently loading
   layout?: 'grid' | 'flex';
   columns?: number; // For grid layout
   size?: "default" | "sm" | "lg" | "icon";
   showDisabledReasons?: boolean;
   className?: string;
+  customRenderers?: Record<string, (actionDesc: ActionDescriptor<GameAction>, isLoading: boolean) => React.ReactNode>;
 }
 
 export function ActionButtonGroup({
@@ -95,6 +97,7 @@ export function ActionButtonGroup({
   size = "default",
   showDisabledReasons = false,
   className,
+  customRenderers,
 }: ActionButtonGroupProps) {
   if (actions.length === 0) {
     return null;
@@ -114,20 +117,29 @@ export function ActionButtonGroup({
 
   return (
     <div className={`${gridClass} ${className || ''}`}>
-      {actions.map((actionDesc, index) => (
-        <div
-          key={`${actionDesc.action.type}-${index}`}
-          className={shouldSpanTwo(index, actions.length) ? 'col-span-2' : ''}
-        >
-          <ActionButton
-            actionDescriptor={actionDesc}
-            onClick={onAction}
-            isLoading={loadingAction === actionDesc.action.type}
-            size={size}
-            showDisabledReason={showDisabledReasons}
-          />
-        </div>
-      ))}
+      {actions.map((actionDesc, index) => {
+        const isLoading = loadingAction === actionDesc.action.type;
+        const customRenderer = customRenderers?.[actionDesc.action.type];
+
+        return (
+          <div
+            key={`${actionDesc.action.type}-${index}`}
+            className={shouldSpanTwo(index, actions.length) ? 'col-span-2' : ''}
+          >
+            {customRenderer ? (
+              customRenderer(actionDesc, isLoading)
+            ) : (
+              <ActionButton
+                actionDescriptor={actionDesc}
+                onClick={onAction}
+                isLoading={isLoading}
+                size={size}
+                showDisabledReason={showDisabledReasons}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
