@@ -71,14 +71,6 @@ export class BuzzerModeStateMachine implements GameStateMachine {
             enabled: true,
             variant: 'secondary',
           });
-
-          actions.push({
-            action: { type: 'end_game' },
-            label: 'End Game',
-            description: 'Stop the game early',
-            enabled: true,
-            variant: 'danger',
-          });
           break;
 
         case 'buzzed':
@@ -94,14 +86,6 @@ export class BuzzerModeStateMachine implements GameStateMachine {
             action: { type: 'judge_answer', correct: false },
             label: 'Incorrect ✗',
             description: 'Deduct points from the buzzer',
-            enabled: true,
-            variant: 'danger',
-          });
-
-          actions.push({
-            action: { type: 'end_game' },
-            label: 'End Game',
-            description: 'Stop the game early',
             enabled: true,
             variant: 'danger',
           });

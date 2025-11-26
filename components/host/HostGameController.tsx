@@ -84,11 +84,10 @@ export function HostGameController({
   const { session, players, currentTrack, currentRound, buzzerPlayer, elapsedSeconds } = gameData;
   const { executeAction, isActionLoading } = gameActions;
 
-  const hasStartedPlayingRef = useRef(false);
-
   // Local UI state
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
   const [judgmentOverrides, setJudgmentOverrides] = useState<Record<string, boolean>>({});
+  const [lastPlayedRoundId, setLastPlayedRoundId] = useState<string | null>(null);
 
   // Destructure Spotify player
   const {
@@ -127,30 +126,34 @@ export function HostGameController({
 
   // Auto-play track when round starts
   useEffect(() => {
-    console.log('[HostGameController] Auto-play check:', {
-      state,
-      hasSpotifyId: !!currentTrack?.spotify_id,
-      isReady,
-      hasStartedPlaying: hasStartedPlayingRef.current
-    });
-
-    if (
+    const shouldAutoPlay =
       state === 'playing' &&
+      currentRound?.id &&
       currentTrack?.spotify_id &&
       isReady &&
-      !hasStartedPlayingRef.current
-    ) {
+      lastPlayedRoundId !== currentRound.id;
+
+    console.log('[HostGameController] Auto-play check:', {
+      state,
+      roundId: currentRound?.id,
+      hasSpotifyId: !!currentTrack?.spotify_id,
+      isReady,
+      lastPlayedRoundId,
+      shouldAutoPlay
+    });
+
+    if (shouldAutoPlay) {
       console.log('[HostGameController] Starting playback:', currentTrack.spotify_id);
       playRef.current(currentTrack.spotify_id)
         .then(() => {
           console.log('[HostGameController] Playback started successfully');
-          hasStartedPlayingRef.current = true;
+          setLastPlayedRoundId(currentRound.id);
         })
         .catch((err) => {
           console.error('[HostGameController] Failed to auto-play:', err);
         });
     }
-  }, [state, currentTrack?.spotify_id, isReady]);
+  }, [state, currentRound?.id, currentTrack?.spotify_id, isReady, lastPlayedRoundId]);
 
   // Auto-pause when someone buzzes
   useEffect(() => {
@@ -159,12 +162,6 @@ export function HostGameController({
     }
   }, [state, isPlaying]);
 
-  // Reset playing flag when state changes away from playing or when round changes
-  useEffect(() => {
-    if (state !== 'playing') {
-      hasStartedPlayingRef.current = false;
-    }
-  }, [state]);
 
   // Trigger buzz animation when state changes to buzzed
   useEffect(() => {

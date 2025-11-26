@@ -8,13 +8,16 @@
 
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGameSessionContext } from "@/lib/contexts/game-session-context";
 import { useHostGame } from "@/hooks/useHostGame";
 import { HostLobby } from "@/components/host/HostLobby";
 import { HostGameController } from "@/components/host/HostGameController";
 import { HostFinalScore } from "@/components/game/HostFinalScore";
+import { PackSelectionModal } from "@/components/host/PackSelectionModal";
 import { LoadingWrapper } from "@/components/shared/LoadingWrapper";
+import { toast } from "sonner";
 import type { GameState } from "@/lib/game/state-machine";
 import { assertUnreachable } from "@/lib/utils/exhaustive-check";
 
@@ -22,6 +25,24 @@ export default function HostPage() {
   const router = useRouter();
   const { sessionId, session } = useGameSessionContext();
   const game = useHostGame(sessionId);
+  const [packModalOpen, setPackModalOpen] = useState(false);
+
+  const handlePackSelected = async (packId: string) => {
+    try {
+      await game.resetGame.mutateAsync({
+        sessionId,
+        newPackId: packId,
+      });
+      setPackModalOpen(false);
+      toast.success("New game started!", {
+        description: "Get ready to play!",
+      });
+    } catch (error) {
+      toast.error("Failed to start new game", {
+        description: error instanceof Error ? error.message : "Please try again",
+      });
+    }
+  };
 
   // Exhaustive switch - TypeScript enforces all states are handled
   const renderGameState = (): React.ReactNode => {
@@ -86,11 +107,20 @@ export default function HostPage() {
 
       case 'finished':
         return (
-          <HostFinalScore
-            players={game.players}
-            rounds={game.rounds}
-            onPlayAgain={() => router.push("/host")}
-          />
+          <>
+            <HostFinalScore
+              players={game.players}
+              rounds={game.rounds}
+              onPlayAgain={() => setPackModalOpen(true)}
+              spotifyPlayer={game.spotifyPlayer}
+            />
+            <PackSelectionModal
+              open={packModalOpen}
+              onOpenChange={setPackModalOpen}
+              onPackSelected={handlePackSelected}
+              isResetting={game.resetGame.isPending}
+            />
+          </>
         );
 
       default:

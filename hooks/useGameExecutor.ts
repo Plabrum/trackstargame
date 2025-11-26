@@ -50,6 +50,10 @@ interface GameMutations {
     mutate: (sessionId: string) => void;
     isPending: boolean;
   };
+  resetGame?: {
+    mutate: (params: { sessionId: string; newPackId: string }) => void;
+    isPending: boolean;
+  };
 }
 
 interface UseGameExecutorParams {

@@ -334,6 +334,15 @@ export type Database = {
           round_id: string
         }[]
       }
+      reset_game: {
+        Args: { p_new_pack_id: string; p_session_id: string }
+        Returns: {
+          first_round: number
+          first_track_id: string
+          new_state: string
+          session_id: string
+        }[]
+      }
       start_game: {
         Args: { p_session_id: string }
         Returns: {

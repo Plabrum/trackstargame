@@ -21,6 +21,7 @@ interface PackCardProps {
   onViewSongs: () => void;
   onStartGame: () => void;
   isStarting?: boolean;
+  actionLabel?: string;
 }
 
 export function PackCard({
@@ -29,6 +30,7 @@ export function PackCard({
   onViewSongs,
   onStartGame,
   isStarting = false,
+  actionLabel = "Start Game",
 }: PackCardProps) {
   return (
     <Card className="hover:shadow-lg transition-shadow flex flex-col">
@@ -76,7 +78,7 @@ export function PackCard({
           disabled={isStarting || trackCount === 0}
         >
           <Play className="h-4 w-4 mr-2" />
-          {isStarting ? "Starting..." : "Start Game"}
+          {isStarting ? "Starting..." : actionLabel}
         </Button>
         {trackCount === 0 && (
           <p className="text-xs text-muted-foreground text-center">

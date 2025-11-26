@@ -72,7 +72,7 @@ const STATE_TRANSITIONS: Record<GameState, GameState[]> = {
   buzzed: ['reveal', 'finished'], // host judges or ends game
   submitted: ['reveal', 'finished'], // host finalizes judgments or ends game
   reveal: ['playing', 'finished'], // next round starts, finished if game over
-  finished: [], // Terminal state
+  finished: ['playing'], // Allow restart with new pack
 };
 
 /**

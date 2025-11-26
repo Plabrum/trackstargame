@@ -63,12 +63,3 @@ export function EndGameButton({ onEndGame, isLoading }: EndGameButtonProps) {
     </Button>
   );
 }
-
-export function UserInfo() {
-  return (
-    <>
-      <UserDisplay />
-      <LogoutButton />
-    </>
-  );
-}

@@ -9,14 +9,22 @@
 
 import { PackGallery } from "@/components/host/PackGallery";
 import { Header } from "@/components/shared/Header";
-import { UserInfo } from "@/components/shared/UserInfo";
+import { UserDisplay, LogoutButton } from "@/components/shared/UserInfo";
 
 export default function SelectPackPage() {
   return (
     <main className="min-h-screen p-6 bg-black">
       <div className="container mx-auto max-w-6xl space-y-6">
         {/* Header */}
-        <Header title="Select a Music Pack" rightContent={<UserInfo />} />
+        <Header
+          title="Select a Music Pack"
+          rightContent={
+            <>
+              <UserDisplay />
+              <LogoutButton />
+            </>
+          }
+        />
 
         {/* Pack Gallery */}
         <PackGallery />

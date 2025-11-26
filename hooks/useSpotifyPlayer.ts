@@ -57,6 +57,7 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
   const deviceIdRef = useRef<string | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const playerRef = useRef<Spotify.Player | null>(null);
+  const stateChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Create API client - memoized so it doesn't recreate on every render
   const api = useMemo(
@@ -123,8 +124,8 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
 
       // Wait for Spotify's backend to register the device
       // This is a known issue with the Web Playback SDK
-      console.log('[Spotify] Waiting 2 seconds for backend to register device...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('[Spotify] Waiting 0.5 seconds for backend to register device...');
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
         // Check current playback state
@@ -154,6 +155,7 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
     });
 
     // Essential: Track playback state changes
+    // Debounce rapid state changes to avoid excessive re-renders
     player.addListener('player_state_changed', (state) => {
       if (!state) {
         console.log('[Spotify] Player state changed: null');
@@ -166,24 +168,32 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
         track: state.track_window.current_track.name,
       });
 
-      const currentTrack = state.track_window.current_track;
-      setIsPlaying(!state.paused);
-      setPlaybackState({
-        isReady: true,
-        isPlaying: !state.paused,
-        isPaused: state.paused,
-        position: state.position,
-        duration: state.duration,
-        trackUri: currentTrack.uri,
-        track: {
-          uri: currentTrack.uri,
-          id: currentTrack.id || '',
-          name: currentTrack.name,
-          artists: currentTrack.artists.map((a: { name: string }) => a.name).join(', '),
-          albumName: currentTrack.album.name || '',
-          albumArt: currentTrack.album.images[0]?.url ?? null,
-        },
-      });
+      // Clear any pending state update
+      if (stateChangeTimeoutRef.current) {
+        clearTimeout(stateChangeTimeoutRef.current);
+      }
+
+      // Debounce state updates by 50ms to batch rapid events
+      stateChangeTimeoutRef.current = setTimeout(() => {
+        const currentTrack = state.track_window.current_track;
+        setIsPlaying(!state.paused);
+        setPlaybackState({
+          isReady: true,
+          isPlaying: !state.paused,
+          isPaused: state.paused,
+          position: state.position,
+          duration: state.duration,
+          trackUri: currentTrack.uri,
+          track: {
+            uri: currentTrack.uri,
+            id: currentTrack.id || '',
+            name: currentTrack.name,
+            artists: currentTrack.artists.map((a: { name: string }) => a.name).join(', '),
+            albumName: currentTrack.album.name || '',
+            albumArt: currentTrack.album.images[0]?.url ?? null,
+          },
+        });
+      }, 50);
     });
 
     // Error listeners - recommended by Spotify for proper diagnostics
@@ -229,6 +239,9 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
 
     // Cleanup
     return () => {
+      if (stateChangeTimeoutRef.current) {
+        clearTimeout(stateChangeTimeoutRef.current);
+      }
       player.disconnect();
     };
   }, [options.accessToken, options.deviceName, options.onError, sdkLoaded]);
@@ -241,25 +254,90 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
 
       const uri = spotifyId.startsWith('spotify:track:') ? spotifyId : `spotify:track:${spotifyId}`;
 
-      await api.player.startResumePlayback(
-        deviceIdRef.current,
-        undefined,
-        [uri],
-        undefined,
-        0
-      );
+      // Check current playback state to see if we're already the active device
+      let activeDeviceId: string | undefined;
+      try {
+        const playbackState = await api.player.getPlaybackState();
+        activeDeviceId = playbackState?.device?.id;
+        console.log('[Spotify] Current active device:', activeDeviceId, 'Our device:', deviceIdRef.current);
+      } catch (err) {
+        console.log('[Spotify] Could not get playback state, will attempt playback anyway:', err);
+      }
 
-      startTimeRef.current = Date.now();
-      setIsPlaying(true);
-      setError(null);
+      // Always specify our device_id unless we're already the active device
+      // This ensures playback targets our Web Playback SDK instance
+      const isAlreadyActiveDevice = activeDeviceId === deviceIdRef.current;
+      const targetDevice = isAlreadyActiveDevice ? undefined : deviceIdRef.current;
+
+      console.log('[Spotify] Playing track:', {
+        uri,
+        activeDeviceId,
+        ourDevice: deviceIdRef.current,
+        isAlreadyActiveDevice,
+        targetDevice
+      });
+
+      // Retry logic for "Device not found" 404 errors
+      // This happens when the Spotify backend hasn't fully registered the device yet
+      const maxRetries = 3;
+      let lastError: Error | null = null;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await api.player.startResumePlayback(
+            targetDevice,
+            undefined,
+            [uri],
+            undefined,
+            0
+          );
+
+          // Success!
+          startTimeRef.current = Date.now();
+          setIsPlaying(true);
+          setError(null);
+          return;
+        } catch (err: any) {
+          lastError = err;
+
+          // Check if it's a 404 "Device not found" error
+          const is404 = err.message?.includes('404') || err.status === 404;
+
+          if (is404 && attempt < maxRetries - 1) {
+            // Wait before retrying (exponential backoff: 500ms, 1000ms, 2000ms)
+            const delay = 500 * Math.pow(2, attempt);
+            console.log(`[Spotify] Device not found (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+
+          // If it's not a 404 or we've exhausted retries, throw
+          break;
+        }
+      }
+
+      // If we get here, all retries failed
+      throw lastError || new Error('Failed to start playback');
     },
     [api]
   );
 
   const pause = useCallback(async () => {
     if (!deviceIdRef.current) return;
-    await api.player.pausePlayback(deviceIdRef.current);
-    setIsPlaying(false);
+    try {
+      await api.player.pausePlayback(deviceIdRef.current);
+      setIsPlaying(false);
+    } catch (err: any) {
+      console.error('[Spotify] Pause error:', err);
+      // If it's a JSON parse error, the device might be stale - try to recover
+      if (err.message?.includes('JSON') || err.message?.includes('SyntaxError')) {
+        console.log('[Spotify] Possible stale device, attempting player pause directly');
+        await playerRef.current?.pause();
+        setIsPlaying(false);
+      } else {
+        throw err;
+      }
+    }
   }, [api]);
 
   const resume = useCallback(async () => {

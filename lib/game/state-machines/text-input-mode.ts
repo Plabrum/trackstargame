@@ -71,14 +71,6 @@ export class TextInputModeStateMachine implements GameStateMachine {
             enabled: true,
             variant: 'secondary',
           });
-
-          actions.push({
-            action: { type: 'end_game' },
-            label: 'End Game',
-            description: 'Stop the game early',
-            enabled: true,
-            variant: 'danger',
-          });
           break;
 
         case 'submitted':
@@ -92,14 +84,6 @@ export class TextInputModeStateMachine implements GameStateMachine {
               ? undefined
               : 'Waiting for all players to submit',
             variant: 'primary',
-          });
-
-          actions.push({
-            action: { type: 'end_game' },
-            label: 'End Game',
-            description: 'Stop the game early',
-            enabled: true,
-            variant: 'danger',
           });
           break;
 

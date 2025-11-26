@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useGameSessionContext } from "@/lib/contexts/game-session-context";
 import { useGameRounds, useTrack } from "@/hooks/queries/use-game";
@@ -18,12 +18,14 @@ import { useGameExecutor } from "@/hooks/useGameExecutor";
 import { PlayerLobby } from "@/components/game/PlayerLobby";
 import { PlayerGameView } from "@/components/game/PlayerGameView";
 import { PlayerFinalScore } from "@/components/game/PlayerFinalScore";
+import { toast } from "sonner";
 import type { GameState } from "@/lib/game/state-machine";
 import { assertUnreachable } from "@/lib/utils/exhaustive-check";
 
 export default function PlayPage() {
   const router = useRouter();
   const { sessionId, session, players } = useGameSessionContext();
+  const prevStateRef = useRef<string | null>(null);
 
   // Player ID state (stored in localStorage)
   const { playerId, setPlayerId } = usePlayerIdentity(sessionId);
@@ -64,7 +66,24 @@ export default function PlayPage() {
   // Reset answer feedback when round changes
   useEffect(() => {
     setAnswerFeedback(null);
+    submitAnswer.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.current_round]);
+
+  // Notify player when game resets
+  useEffect(() => {
+    const prevState = prevStateRef.current;
+    const currentState = session.state;
+
+    if (prevState === 'finished' && currentState === 'playing') {
+      toast.info("New game starting!", {
+        description: "Get ready to play!",
+        duration: 3000,
+      });
+    }
+
+    prevStateRef.current = currentState;
+  }, [session.state]);
 
   // Get buzzer player
   const buzzerPlayer = currentRound?.buzzer_player_id

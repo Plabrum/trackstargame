@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Trophy } from "lucide-react";
 import { Leaderboard } from "@/components/shared/Leaderboard";
 import { Header } from "@/components/shared/Header";
-import { UserInfo } from "@/components/shared/UserInfo";
+import { UserDisplay, LogoutButton } from "@/components/shared/UserInfo";
 import { PartyGameHighlights } from "./PartyGameHighlights";
 import { ShareButton } from "./ShareButton";
 import { ShareablePartyCard } from "./ShareablePartyCard";
@@ -34,9 +34,19 @@ export function MultiplayerFinalScore({ players, rounds, onPlayAgain, currentPla
   const winner = sortedPlayers[0];
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="container mx-auto p-6 max-w-4xl space-y-6 pb-32">
       {/* Header */}
-      <Header title="Game Over" rightContent={showUserInfo ? <UserInfo /> : undefined} />
+      <Header
+        title="Game Over"
+        rightContent={
+          showUserInfo ? (
+            <>
+              <UserDisplay />
+              <LogoutButton />
+            </>
+          ) : undefined
+        }
+      />
 
       {/* Winner Podium */}
       <Card className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-orange-50">

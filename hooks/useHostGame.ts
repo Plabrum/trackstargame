@@ -7,7 +7,7 @@
  * Throws if session fails to load - errors are shown via toast notifications.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameSession, useGamePlayers, useGameRounds, useRoundAnswers, useTrack } from './queries/use-game';
 import {
   useStartGame,
@@ -17,6 +17,7 @@ import {
   useRevealAnswer,
   useEndGame,
   useSubmitAnswer,
+  useResetGame,
 } from './mutations/use-game-mutations';
 import { useGameExecutor } from './useGameExecutor';
 import { useSpotifyPlayer } from './useSpotifyPlayer';
@@ -86,6 +87,7 @@ export function useHostGame(sessionId: string) {
   const revealAnswer = useRevealAnswer();
   const endGame = useEndGame();
   const submitAnswer = useSubmitAnswer();
+  const resetGame = useResetGame();
 
   // Game action executor
   const { executeAction, isActionLoading } = useGameExecutor({
@@ -97,6 +99,7 @@ export function useHostGame(sessionId: string) {
       advanceRound,
       revealAnswer,
       endGame,
+      resetGame,
     },
   });
 
@@ -106,6 +109,19 @@ export function useHostGame(sessionId: string) {
     submitAnswer.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.current_round]);
+
+  // Store pause function in a ref to avoid re-running effect when it changes
+  const pauseRef = useRef(spotifyPlayer.pause);
+  useEffect(() => {
+    pauseRef.current = spotifyPlayer.pause;
+  }, [spotifyPlayer.pause]);
+
+  // Stop Spotify playback when game finishes
+  useEffect(() => {
+    if (session?.state === 'finished' && spotifyPlayer.isReady) {
+      pauseRef.current();
+    }
+  }, [session?.state, spotifyPlayer.isReady]);
 
   // Handle answer submission for host player
   const handleSubmitAnswer = async (answer: string) => {
@@ -177,6 +193,7 @@ export function useHostGame(sessionId: string) {
       hasSubmittedAnswer: false as never,
       answerFeedback: null as never,
       finalizeJudgments: finalizeJudgments as never,
+      resetGame: resetGame as never,
     };
   }
 
@@ -209,5 +226,8 @@ export function useHostGame(sessionId: string) {
 
     // Text input mode finalization
     finalizeJudgments,
+
+    // Play again functionality
+    resetGame,
   };
 }
