@@ -60,6 +60,7 @@ export default function HostPage() {
             spotifyError={game.spotifyPlayer.error}
             onEndGame={() => game.executeAction({ type: 'end_game' })}
             isEndingGame={game.isActionLoading('end_game')}
+            onPrimeAudio={game.spotifyPlayer.primeAudioContext}
           />
         );
 
@@ -102,6 +103,7 @@ export default function HostPage() {
               },
               isFinalizing: game.isActionLoading('finalize_judgments'),
             }}
+            onPrimeAudio={game.spotifyPlayer.primeAudioContext}
           />
         );
 

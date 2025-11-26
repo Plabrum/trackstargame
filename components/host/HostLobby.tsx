@@ -32,9 +32,10 @@ interface HostLobbyProps {
   spotifyError: string | null;
   onEndGame: () => void;
   isEndingGame: boolean;
+  onPrimeAudio?: () => Promise<void>;
 }
 
-export function HostLobby({ session, players, onStartGame, isStarting, isSpotifyReady, spotifyError, onEndGame, isEndingGame }: HostLobbyProps) {
+export function HostLobby({ session, players, onStartGame, isStarting, isSpotifyReady, spotifyError, onEndGame, isEndingGame, onPrimeAudio }: HostLobbyProps) {
   const sessionId = session.id;
   const hostName = session.host_name;
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/play/${sessionId}` : "";
@@ -200,6 +201,9 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
       <div className="flex justify-center">
         <Button
           onClick={async () => {
+            // Prime audio context for Safari (must be in user gesture)
+            await onPrimeAudio?.();
+
             // Derive settings from current state
             const enableTextInputMode = gameMode === 'solo' || partyTextInput;
 

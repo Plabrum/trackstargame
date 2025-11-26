@@ -72,6 +72,7 @@ interface HostGameControllerProps {
   spotifyPlayer: UseSpotifyPlayerReturn;
   soloMode?: SoloModeProps;
   textInputMode?: TextInputModeProps;
+  onPrimeAudio?: () => Promise<void>;
 }
 
 export function HostGameController({
@@ -80,6 +81,7 @@ export function HostGameController({
   spotifyPlayer,
   soloMode,
   textInputMode,
+  onPrimeAudio,
 }: HostGameControllerProps) {
   const { session, players, currentTrack, currentRound, buzzerPlayer, elapsedSeconds } = gameData;
   const { executeAction, isActionLoading } = gameActions;
@@ -88,6 +90,8 @@ export function HostGameController({
   const [showBuzzAnimation, setShowBuzzAnimation] = useState(false);
   const [judgmentOverrides, setJudgmentOverrides] = useState<Record<string, boolean>>({});
   const [lastPlayedRoundId, setLastPlayedRoundId] = useState<string | null>(null);
+  const [autoPlayAttempts, setAutoPlayAttempts] = useState<number>(0);
+  const maxAutoPlayAttempts = 3;
 
   // Destructure Spotify player
   const {
@@ -265,7 +269,12 @@ export function HostGameController({
                 {/* GENERIC ACTION CONTROLS */}
                 <ActionButtonGroup
                   actions={availableActions}
-                  onAction={(action) => {
+                  onAction={async (action) => {
+                    // Prime audio for Safari before actions that start playback
+                    if (action.type === 'advance_round' || action.type === 'start_game') {
+                      await onPrimeAudio?.();
+                    }
+
                     // Handle judgment overrides for finalize_judgments action
                     if (action.type === 'finalize_judgments') {
                       executeAction({

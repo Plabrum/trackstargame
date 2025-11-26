@@ -45,6 +45,7 @@ export interface UseSpotifyPlayerReturn {
   resume: () => Promise<void>;
   setVolume: (volume: number) => Promise<void>;
   getElapsedSeconds: () => number;
+  primeAudioContext: () => Promise<void>;
 }
 
 export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPlayerReturn {
@@ -275,8 +276,8 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
         targetDevice: deviceIdRef.current
       });
 
-      // Retry logic for "Device not found" 404 errors
-      // This happens when the Spotify backend hasn't fully registered the device yet
+      // Retry logic for transient errors
+      // Common issues: Device not found (404), rate limits (429), network errors, etc.
       const maxRetries = 3;
       let lastError: Error | null = null;
 
@@ -298,18 +299,24 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
         } catch (err: any) {
           lastError = err;
 
-          // Check if it's a 404 "Device not found" error
+          // Check if it's a retryable error
           const is404 = err.message?.includes('404') || err.status === 404;
+          const is429 = err.message?.includes('429') || err.status === 429; // Rate limit
+          const is5xx = err.status >= 500 && err.status < 600; // Server errors
+          const isNetworkError = err.message?.toLowerCase().includes('network') ||
+                                 err.message?.toLowerCase().includes('fetch');
 
-          if (is404 && attempt < maxRetries - 1) {
+          const isRetryable = is404 || is429 || is5xx || isNetworkError;
+
+          if (isRetryable && attempt < maxRetries - 1) {
             // Wait before retrying (exponential backoff: 500ms, 1000ms, 2000ms)
             const delay = 500 * Math.pow(2, attempt);
-            console.log(`[Spotify] Device not found (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+            console.log(`[Spotify] Retryable error (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`, err);
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
 
-          // If it's not a 404 or we've exhausted retries, throw
+          // If it's not retryable or we've exhausted retries, throw
           break;
         }
       }
@@ -353,6 +360,24 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
     return startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 0;
   }, []);
 
+  // Prime the audio context for Safari - must be called from a user gesture
+  const primeAudioContext = useCallback(async () => {
+    if (!playerRef.current) {
+      console.log('[Spotify] Player not initialized, cannot prime audio');
+      return;
+    }
+
+    try {
+      // Set volume to 0, then immediately back to current volume
+      // This "primes" the audio context in Safari without playing sound
+      await playerRef.current.setVolume(0);
+      await playerRef.current.setVolume(0.8);
+      console.log('[Spotify] Audio context primed for Safari');
+    } catch (err) {
+      console.error('[Spotify] Failed to prime audio context:', err);
+    }
+  }, []);
+
   return {
     isReady,
     isPlaying,
@@ -363,6 +388,7 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
     resume,
     setVolume,
     getElapsedSeconds,
+    primeAudioContext,
   };
 }
 
