@@ -18,9 +18,15 @@ interface SoloFinalScoreProps {
   rounds: GameRound[];
   onPlayAgain: () => void;
   albumArtUrl?: string;
+  bestRound?: {
+    trackTitle: string;
+    trackArtist: string;
+    points: number;
+    roundNumber: number;
+  };
 }
 
-export function SoloFinalScore({ player, rounds, onPlayAgain, albumArtUrl }: SoloFinalScoreProps) {
+export function SoloFinalScore({ player, rounds, onPlayAgain, albumArtUrl, bestRound }: SoloFinalScoreProps) {
   const shareableRef = useRef<HTMLDivElement>(null);
 
   // Calculate stats
@@ -66,6 +72,7 @@ export function SoloFinalScore({ player, rounds, onPlayAgain, albumArtUrl }: Sol
           rounds={rounds}
           accuracy={accuracy}
           albumArtUrl={albumArtUrl}
+          bestRound={bestRound}
         />
       </div>
     </div>

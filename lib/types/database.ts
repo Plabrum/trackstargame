@@ -263,6 +263,7 @@ export type Database = {
           primary_genre: string | null
           release_year: number | null
           spotify_id: string
+          spotify_popularity: number | null
           title: string
         }
         Insert: {
@@ -275,6 +276,7 @@ export type Database = {
           primary_genre?: string | null
           release_year?: number | null
           spotify_id: string
+          spotify_popularity?: number | null
           title: string
         }
         Update: {
@@ -287,6 +289,7 @@ export type Database = {
           primary_genre?: string | null
           release_year?: number | null
           spotify_id?: string
+          spotify_popularity?: number | null
           title?: string
         }
         Relationships: [

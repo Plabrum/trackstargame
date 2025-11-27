@@ -53,6 +53,12 @@ export function HostFinalScore({ players, rounds, onPlayAgain, currentPlayerId, 
       rounds={rounds}
       onPlayAgain={onPlayAgain}
       albumArtUrl={albumArt ?? undefined}
+      bestRound={bestRound && bestRoundTrack ? {
+        trackTitle: bestRoundTrack.title,
+        trackArtist: bestRoundTrack.artist,
+        points: bestRound.points_awarded || 0,
+        roundNumber: bestRound.round_number,
+      } : undefined}
     />
   ) : (
     <MultiplayerFinalScore

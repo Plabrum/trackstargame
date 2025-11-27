@@ -48,6 +48,12 @@ export function FinalScore({ players, rounds, onPlayAgain, currentPlayerId }: Fi
         rounds={rounds}
         onPlayAgain={onPlayAgain}
         albumArtUrl={albumArt ?? undefined}
+        bestRound={bestRound && bestRoundTrack ? {
+          trackTitle: bestRoundTrack.title,
+          trackArtist: bestRoundTrack.artist,
+          points: bestRound.points_awarded || 0,
+          roundNumber: bestRound.round_number,
+        } : undefined}
       />
     );
   }
