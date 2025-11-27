@@ -291,7 +291,18 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
             0
           );
 
-          // Success!
+          // Success! Now ensure volume is set properly
+          try {
+            // Set volume through both the API and the player instance
+            // This ensures audio is audible in all scenarios
+            await api.player.setPlaybackVolume(80, deviceIdRef.current);
+            await playerRef.current?.setVolume(0.8);
+            console.log('[Spotify] Volume set to 80% after playback start');
+          } catch (volErr) {
+            // Don't fail playback if volume setting fails
+            console.warn('[Spotify] Could not set volume, but playback started:', volErr);
+          }
+
           startTimeRef.current = Date.now();
           setIsPlaying(true);
           setError(null);
@@ -368,13 +379,26 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
     }
 
     try {
-      // Set volume to 0, then immediately back to current volume
-      // This "primes" the audio context in Safari without playing sound
-      await playerRef.current.setVolume(0);
+      // Multiple strategies to unlock audio in Safari:
+
+      // 1. Call activateElement() to unlock the audio context
+      // This is the recommended way for Spotify Web Playback SDK
+      console.log('[Spotify] Activating player element...');
+      await playerRef.current.activateElement();
+
+      // 2. Set volume to ensure audio is ready
       await playerRef.current.setVolume(0.8);
-      console.log('[Spotify] Audio context primed for Safari');
+
+      console.log('[Spotify] Audio context primed successfully');
     } catch (err) {
       console.error('[Spotify] Failed to prime audio context:', err);
+      // Fallback: try just setting volume
+      try {
+        await playerRef.current.setVolume(0.8);
+        console.log('[Spotify] Fallback priming successful');
+      } catch (fallbackErr) {
+        console.error('[Spotify] Fallback priming also failed:', fallbackErr);
+      }
     }
   }, []);
 
