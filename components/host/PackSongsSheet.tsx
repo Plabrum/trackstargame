@@ -43,7 +43,7 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
         .from('pack_tracks')
         .select(`
           position,
-          track:tracks (
+          track:tracks_with_artists (
             id,
             title,
             artist,

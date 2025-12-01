@@ -50,6 +50,62 @@ class SpotifyClient:
             print(f"Error fetching artist {artist_id}: {e}")
             return []
 
+    def search_artist_by_name(self, name: str, limit: int = 10) -> List[Dict]:
+        """
+        Search Spotify for artists by name.
+
+        Args:
+            name: Artist name to search for
+            limit: Maximum number of results to return (default 10)
+
+        Returns:
+            List of artist dicts sorted by follower count (descending)
+        """
+        try:
+            results = self.sp.search(q=f'artist:{name}', type='artist', limit=limit)
+            artists = results.get('artists', {}).get('items', [])
+
+            # Sort by follower count (most popular first)
+            return sorted(
+                artists,
+                key=lambda a: a.get('followers', {}).get('total', 0),
+                reverse=True
+            )
+        except Exception as e:
+            print(f"Error searching for artist '{name}': {e}")
+            return []
+
+    def get_best_artist_match(self, name: str) -> Optional[Dict]:
+        """
+        Get the best Spotify artist match for a name.
+
+        Prioritizes exact name matches (case-insensitive), then falls back
+        to the artist with the highest follower count.
+
+        Args:
+            name: Artist name to match
+
+        Returns:
+            Artist dict with keys: id, name, genres, followers, images, etc.
+            Returns None if no matches found.
+        """
+        results = self.search_artist_by_name(name, limit=10)
+        if not results:
+            return None
+
+        # Look for exact name match (case-insensitive)
+        exact_matches = [
+            artist for artist in results
+            if artist['name'].lower() == name.lower()
+        ]
+
+        if exact_matches:
+            # Return exact match with highest follower count
+            return max(exact_matches, key=lambda a: a.get('followers', {}).get('total', 0))
+
+        # Fall back to artist with highest follower count
+        return results[0]
+
     def _extract_year(self, release_date: str) -> Optional[int]:
         """
         Extract year from Spotify release_date string.
@@ -109,12 +165,15 @@ class SpotifyClient:
 
             track = results['tracks']['items'][0]
 
-            # Extract artist IDs for genre lookup
+            # Extract artist IDs and names for normalization
             artist_ids = [artist['id'] for artist in track['artists']]
+            artist_names = [artist['name'] for artist in track['artists']]
 
             return {
                 'title': track['name'],
-                'artist': ', '.join(artist['name'] for artist in track['artists']),
+                'artist': ', '.join(artist_names),  # For backwards compatibility
+                'artist_ids': artist_ids,  # NEW: List of Spotify artist IDs
+                'artist_names': artist_names,  # NEW: List of artist names
                 'spotify_id': track['id'],
                 'album': track['album']['name'],
                 'release_date': track['album']['release_date'],
@@ -190,12 +249,15 @@ class SpotifyClient:
 
                     track = item['track']
 
-                    # Extract artist IDs for genre lookup
+                    # Extract artist IDs and names for normalization
                     artist_ids = [artist['id'] for artist in track['artists']]
+                    artist_names = [artist['name'] for artist in track['artists']]
 
                     tracks.append({
                         'title': track['name'],
-                        'artist': ', '.join(artist['name'] for artist in track['artists']),
+                        'artist': ', '.join(artist_names),  # For backwards compatibility
+                        'artist_ids': artist_ids,  # NEW: List of Spotify artist IDs
+                        'artist_names': artist_names,  # NEW: List of artist names
                         'spotify_id': track['id'],
                         'album': track['album']['name'],
                         'release_date': track['album']['release_date'],

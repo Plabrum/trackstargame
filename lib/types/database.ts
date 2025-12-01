@@ -7,13 +7,66 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
+      artists: {
+        Row: {
+          created_at: string | null
+          genres: string[] | null
+          id: string
+          image_url: string | null
+          name: string
+          spotify_artist_id: string | null
+          spotify_followers: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          genres?: string[] | null
+          id?: string
+          image_url?: string | null
+          name: string
+          spotify_artist_id?: string | null
+          spotify_followers?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          genres?: string[] | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          spotify_artist_id?: string | null
+          spotify_followers?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       game_rounds: {
         Row: {
           buzz_time: string | null
@@ -66,6 +119,13 @@ export type Database = {
             referencedRelation: "game_sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "game_rounds_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks_old_backup"
+            referencedColumns: ["id"]
+          },
         ]
       }
       game_sessions: {
@@ -78,7 +138,7 @@ export type Database = {
           id: string
           pack_id: string | null
           round_start_time: string | null
-          state: string | null
+          state: string
           total_rounds: number
           updated_at: string | null
         }
@@ -91,7 +151,7 @@ export type Database = {
           id?: string
           pack_id?: string | null
           round_start_time?: string | null
-          state?: string | null
+          state?: string
           total_rounds?: number
           updated_at?: string | null
         }
@@ -104,7 +164,7 @@ export type Database = {
           id?: string
           pack_id?: string | null
           round_start_time?: string | null
-          state?: string | null
+          state?: string
           total_rounds?: number
           updated_at?: string | null
         }
@@ -153,6 +213,13 @@ export type Database = {
             columns: ["track_id"]
             isOneToOne: false
             referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pack_tracks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks_with_artists"
             referencedColumns: ["id"]
           },
         ]
@@ -264,15 +331,61 @@ export type Database = {
           },
         ]
       }
+      track_artists: {
+        Row: {
+          artist_id: string
+          created_at: string | null
+          id: string
+          position: number
+          track_id: string
+        }
+        Insert: {
+          artist_id: string
+          created_at?: string | null
+          id?: string
+          position: number
+          track_id: string
+        }
+        Update: {
+          artist_id?: string
+          created_at?: string | null
+          id?: string
+          position?: number
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "track_artists_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "track_artists_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "track_artists_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks_with_artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracks: {
         Row: {
           album_name: string | null
-          artist: string
+          artist_backup: string | null
           created_at: string | null
-          genres: string[] | null
+          genres_backup: string[] | null
           id: string
           isrc: string | null
-          primary_genre: string | null
+          primary_genre_backup: string | null
           release_year: number | null
           spotify_id: string
           spotify_popularity: number | null
@@ -281,12 +394,12 @@ export type Database = {
         }
         Insert: {
           album_name?: string | null
-          artist: string
+          artist_backup?: string | null
           created_at?: string | null
-          genres?: string[] | null
+          genres_backup?: string[] | null
           id?: string
           isrc?: string | null
-          primary_genre?: string | null
+          primary_genre_backup?: string | null
           release_year?: number | null
           spotify_id: string
           spotify_popularity?: number | null
@@ -295,12 +408,12 @@ export type Database = {
         }
         Update: {
           album_name?: string | null
-          artist?: string
+          artist_backup?: string | null
           created_at?: string | null
-          genres?: string[] | null
+          genres_backup?: string[] | null
           id?: string
           isrc?: string | null
-          primary_genre?: string | null
+          primary_genre_backup?: string | null
           release_year?: number | null
           spotify_id?: string
           spotify_popularity?: number | null
@@ -309,9 +422,106 @@ export type Database = {
         }
         Relationships: []
       }
+      tracks_old_backup: {
+        Row: {
+          album_name: string | null
+          artist: string
+          created_at: string | null
+          genres: string[] | null
+          id: string
+          isrc: string | null
+          pack_id: string | null
+          primary_genre: string | null
+          release_year: number | null
+          spotify_id: string
+          spotify_popularity: number | null
+          title: string
+        }
+        Insert: {
+          album_name?: string | null
+          artist: string
+          created_at?: string | null
+          genres?: string[] | null
+          id?: string
+          isrc?: string | null
+          pack_id?: string | null
+          primary_genre?: string | null
+          release_year?: number | null
+          spotify_id: string
+          spotify_popularity?: number | null
+          title: string
+        }
+        Update: {
+          album_name?: string | null
+          artist?: string
+          created_at?: string | null
+          genres?: string[] | null
+          id?: string
+          isrc?: string | null
+          pack_id?: string | null
+          primary_genre?: string | null
+          release_year?: number | null
+          spotify_id?: string
+          spotify_popularity?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracks_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      tracks_with_artists: {
+        Row: {
+          album_name: string | null
+          artist: string | null
+          created_at: string | null
+          genres: string[] | null
+          id: string | null
+          isrc: string | null
+          primary_genre: string | null
+          release_year: number | null
+          spotify_id: string | null
+          spotify_popularity: number | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          album_name?: string | null
+          artist?: never
+          created_at?: string | null
+          genres?: never
+          id?: string | null
+          isrc?: string | null
+          primary_genre?: never
+          release_year?: number | null
+          spotify_id?: string | null
+          spotify_popularity?: number | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          album_name?: string | null
+          artist?: never
+          created_at?: string | null
+          genres?: never
+          id?: string | null
+          isrc?: string | null
+          primary_genre?: never
+          release_year?: number | null
+          spotify_id?: string | null
+          spotify_popularity?: number | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       advance_round: {
@@ -330,6 +540,9 @@ export type Database = {
           success: boolean
         }[]
       }
+      get_track_artists: { Args: { p_track_id: string }; Returns: string }
+      get_track_genres: { Args: { p_track_id: string }; Returns: string[] }
+      get_track_primary_genre: { Args: { p_track_id: string }; Returns: string }
       increment_player_score: {
         Args: { player_id: string; points: number }
         Returns: undefined
@@ -503,7 +716,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+
