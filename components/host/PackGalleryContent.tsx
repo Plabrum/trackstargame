@@ -57,7 +57,7 @@ export function PackGalleryContent({
       const packsWithCounts = await Promise.all(
         packsData.map(async (pack) => {
           const { count } = await supabase
-            .from('tracks')
+            .from('pack_tracks')
             .select('*', { count: 'exact', head: true })
             .eq('pack_id', pack.id);
           return { ...pack, track_count: count || 0 };

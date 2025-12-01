@@ -66,15 +66,20 @@ def create_pack(name: str, description: Optional[str] = None, tags: Optional[Lis
 
 def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
     """
-    Add multiple tracks to a pack.
+    Add multiple tracks to a pack (with deduplication).
+
+    This function uses the normalized schema:
+    1. Upserts tracks into the tracks table (by spotify_id)
+    2. Creates associations in pack_tracks table
 
     Args:
         pack_id: UUID of the pack
         tracks: List of track dicts with 'title', 'artist', 'spotify_id'
-               and optionally 'release_year', 'album_name', 'primary_genre'
+               and optionally 'release_year', 'album_name', 'primary_genre',
+               'genres', 'spotify_popularity', 'isrc'
 
     Returns:
-        Number of tracks added
+        Number of tracks added to pack
     """
     if not tracks:
         return 0
@@ -82,34 +87,77 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        # Prepare data for bulk insert
-        values = [
+        # Step 1: Upsert tracks (insert or update if spotify_id exists)
+        track_values = [
             (
-                pack_id,
+                track['spotify_id'],
                 track['title'],
                 track['artist'],
-                track['spotify_id'],
-                track.get('release_year'),
                 track.get('album_name'),
-                track.get('primary_genre')
+                track.get('release_year'),
+                track.get('primary_genre'),
+                track.get('genres'),  # Array field
+                track.get('spotify_popularity'),
+                track.get('isrc')
             )
             for track in tracks
         ]
 
-        # Bulk insert
         execute_values(
             cursor,
             """
-            INSERT INTO tracks (pack_id, title, artist, spotify_id, release_year, album_name, primary_genre)
+            INSERT INTO tracks (spotify_id, title, artist, album_name, release_year, primary_genre, genres, spotify_popularity, isrc)
             VALUES %s
+            ON CONFLICT (spotify_id)
+            DO UPDATE SET
+                title = EXCLUDED.title,
+                artist = EXCLUDED.artist,
+                album_name = COALESCE(EXCLUDED.album_name, tracks.album_name),
+                release_year = COALESCE(EXCLUDED.release_year, tracks.release_year),
+                primary_genre = COALESCE(EXCLUDED.primary_genre, tracks.primary_genre),
+                genres = COALESCE(EXCLUDED.genres, tracks.genres),
+                spotify_popularity = COALESCE(EXCLUDED.spotify_popularity, tracks.spotify_popularity),
+                isrc = COALESCE(EXCLUDED.isrc, tracks.isrc),
+                updated_at = NOW()
             """,
-            values
+            track_values
+        )
+
+        # Step 2: Get track IDs for linking
+        spotify_ids = [track['spotify_id'] for track in tracks]
+        placeholders = ','.join(['%s'] * len(spotify_ids))
+
+        cursor.execute(
+            f"""
+            SELECT id, spotify_id FROM tracks
+            WHERE spotify_id IN ({placeholders})
+            """,
+            spotify_ids
+        )
+
+        id_lookup = {row[1]: row[0] for row in cursor.fetchall()}
+
+        # Step 3: Link tracks to pack
+        link_values = [
+            (pack_id, id_lookup[track['spotify_id']], i + 1)
+            for i, track in enumerate(tracks)
+            if track['spotify_id'] in id_lookup
+        ]
+
+        execute_values(
+            cursor,
+            """
+            INSERT INTO pack_tracks (pack_id, track_id, position)
+            VALUES %s
+            ON CONFLICT (pack_id, track_id) DO NOTHING
+            """,
+            link_values
         )
 
         cursor.close()
 
-        print(f"Added {len(tracks)} tracks to pack {pack_id}")
-        return len(tracks)
+        print(f"Added {len(link_values)} tracks to pack {pack_id}")
+        return len(link_values)
 
 
 def update_track_metadata(track_id: str, release_year: Optional[int] = None,

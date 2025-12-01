@@ -32,7 +32,7 @@ interface PackSongsSheetProps {
 }
 
 export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps) {
-  // Fetch tracks for this pack using direct Supabase query
+  // Fetch tracks for this pack using join query
   const { data: tracks, isLoading } = useQuery({
     queryKey: ['pack_tracks', pack?.id],
     queryFn: async () => {
@@ -40,13 +40,29 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
 
       const supabase = createClient();
       const { data, error } = await supabase
-        .from('tracks')
-        .select('*')
+        .from('pack_tracks')
+        .select(`
+          position,
+          track:tracks (
+            id,
+            title,
+            artist,
+            spotify_id,
+            album_name,
+            release_year,
+            primary_genre,
+            genres,
+            spotify_popularity,
+            isrc
+          )
+        `)
         .eq('pack_id', pack.id)
-        .order('title');
+        .order('position');
 
       if (error) throw error;
-      return data || [];
+
+      // Transform response to extract track data
+      return data?.map((pt) => pt.track).filter(Boolean) || [];
     },
     enabled: !!pack?.id && open,
   });

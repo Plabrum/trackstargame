@@ -214,3 +214,48 @@ class SpotifyClient:
         except Exception as e:
             print(f"Error fetching playlist: {e}")
             return None, []
+
+    def get_tracks_batch(self, spotify_ids: List[str]) -> List[Dict[str, Optional[str]]]:
+        """
+        Fetch track data for multiple Spotify IDs at once (up to 50).
+
+        Args:
+            spotify_ids: List of Spotify track IDs (max 50)
+
+        Returns:
+            List of dicts with track data: {
+                'spotify_id': str,
+                'popularity': int (0-100),
+                'isrc': str or None
+            }
+        """
+        if not spotify_ids:
+            return []
+
+        if len(spotify_ids) > 50:
+            raise ValueError("Maximum 50 track IDs per request")
+
+        try:
+            # Fetch tracks from Spotify
+            results = self.sp.tracks(spotify_ids)
+
+            tracks_data = []
+            for track in results.get('tracks', []):
+                if track is None:
+                    # Track not found or unavailable
+                    continue
+
+                # Extract ISRC from external_ids
+                isrc = track.get('external_ids', {}).get('isrc')
+
+                tracks_data.append({
+                    'spotify_id': track['id'],
+                    'popularity': track.get('popularity'),
+                    'isrc': isrc
+                })
+
+            return tracks_data
+
+        except Exception as e:
+            print(f"Error fetching tracks batch: {e}")
+            return []
