@@ -238,6 +238,7 @@ export function PackDetailsSheet({
                   session_id: entry.sessionId,
                   is_host: false,
                   joined_at: entry.gameDate,
+                  spotify_user_id: null,
                 }))}
                 variant="final"
                 title="Top 10 All-Time"

@@ -259,6 +259,7 @@ export type Database = {
           name: string
           score: number | null
           session_id: string | null
+          spotify_user_id: string | null
         }
         Insert: {
           id?: string
@@ -267,6 +268,7 @@ export type Database = {
           name: string
           score?: number | null
           session_id?: string | null
+          spotify_user_id?: string | null
         }
         Update: {
           id?: string
@@ -275,6 +277,7 @@ export type Database = {
           name?: string
           score?: number | null
           session_id?: string | null
+          spotify_user_id?: string | null
         }
         Relationships: [
           {
@@ -382,6 +385,7 @@ export type Database = {
       }
       tracks: {
         Row: {
+          album_image_url: string | null
           album_name: string | null
           artist_backup: string | null
           created_at: string | null
@@ -397,6 +401,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          album_image_url?: string | null
           album_name?: string | null
           artist_backup?: string | null
           created_at?: string | null
@@ -412,6 +417,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          album_image_url?: string | null
           album_name?: string | null
           artist_backup?: string | null
           created_at?: string | null
@@ -530,25 +536,9 @@ export type Database = {
       }
     }
     Functions: {
-      advance_round: {
-        Args: { p_session_id: string }
-        Returns: {
-          new_round: number
-          new_state: string
-          session_id: string
-          track_id: string
-        }[]
-      }
       calculate_track_popularity_score: {
         Args: { p_track_id: string }
         Returns: number
-      }
-      finalize_judgments: {
-        Args: { p_overrides?: Json; p_session_id: string }
-        Returns: {
-          leaderboard: Json
-          success: boolean
-        }[]
       }
       get_track_artists: { Args: { p_track_id: string }; Returns: string }
       get_track_genres: { Args: { p_track_id: string }; Returns: string[] }
@@ -556,47 +546,6 @@ export type Database = {
       increment_player_score: {
         Args: { player_id: string; points: number }
         Returns: undefined
-      }
-      judge_answer: {
-        Args: { p_correct: boolean; p_session_id: string }
-        Returns: {
-          buzzer_player_id: string
-          correct: boolean
-          new_player_score: number
-          points_awarded: number
-          round_id: string
-        }[]
-      }
-      reset_game: {
-        Args: { p_new_pack_id: string; p_session_id: string }
-        Returns: {
-          first_round: number
-          first_track_id: string
-          new_state: string
-          session_id: string
-        }[]
-      }
-      start_game: {
-        Args: { p_session_id: string }
-        Returns: {
-          current_round: number
-          first_track_id: string
-          id: string
-          state: string
-        }[]
-      }
-      submit_answer: {
-        Args: {
-          p_answer: string
-          p_auto_validated: boolean
-          p_player_id: string
-          p_points_awarded: number
-          p_session_id: string
-        }
-        Returns: {
-          all_players_submitted: boolean
-          answer_id: string
-        }[]
       }
     }
     Enums: {

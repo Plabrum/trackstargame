@@ -20,5 +20,5 @@ BEGIN
   RAISE NOTICE '  - Dropped function: get_track_primary_genre(uuid)';
   RAISE NOTICE '';
   RAISE NOTICE '  All code now uses the normalized schema directly:';
-  RAISE NOTICE '    tracks  track_artists ’ artists';
+  RAISE NOTICE '    tracks -> track_artists -> artists';
 END $$;

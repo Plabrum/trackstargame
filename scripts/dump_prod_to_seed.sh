@@ -10,12 +10,15 @@ DATA_DIR="supabase/seed_data"
 OUTPUT_FILE="supabase/seed.sql"
 
 # Tables in dependency order (only dump master data, not transient game sessions)
-TABLES=("packs" "tracks")
+TABLES=("packs" "tracks" "artists" "pack_tracks" "track_artists")
 
 # Define column order for each table (must match database schema)
 declare -A TABLE_COLUMNS
 TABLE_COLUMNS["packs"]="id,name,description,created_at,tags"
-TABLE_COLUMNS["tracks"]="id,pack_id,title,artist,spotify_id,created_at,release_year,album_name,primary_genre,genres"
+TABLE_COLUMNS["tracks"]="id,spotify_id,title,album_name,release_year,spotify_popularity,isrc,created_at,updated_at,album_image_url"
+TABLE_COLUMNS["artists"]="id,name,spotify_artist_id,genres,spotify_followers,image_url,created_at,updated_at"
+TABLE_COLUMNS["pack_tracks"]="id,pack_id,track_id,position,created_at"
+TABLE_COLUMNS["track_artists"]="id,track_id,artist_id,position,created_at"
 
 echo "Dumping production data..."
 echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"

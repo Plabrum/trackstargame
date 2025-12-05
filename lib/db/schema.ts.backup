@@ -53,9 +53,11 @@ export const players = pgTable("players", {
 	score: integer().default(0),
 	joinedAt: timestamp("joined_at", { mode: 'string' }).defaultNow(),
 	isHost: boolean("is_host").default(false).notNull(),
+	spotifyUserId: text("spotify_user_id"), // Spotify user ID for authenticated hosts
 }, (table) => [
 	index("idx_players_is_host").using("btree", table.sessionId.asc().nullsLast().op("bool_ops"), table.isHost.asc().nullsLast().op("uuid_ops")).where(sql`(is_host = true)`),
 	index("idx_players_session_id").using("btree", table.sessionId.asc().nullsLast().op("uuid_ops")),
+	index("idx_players_spotify_user_id").using("btree", table.spotifyUserId.asc().nullsLast().op("text_ops")).where(sql`(spotify_user_id IS NOT NULL)`),
 	foreignKey({
 			columns: [table.sessionId],
 			foreignColumns: [gameSessions.id],
