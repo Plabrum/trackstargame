@@ -27,7 +27,7 @@ interface GameMutations {
 
   // Host mutations
   startGame?: {
-    mutate: (sessionId: string) => void;
+    mutate: (params: { sessionId: string; spotifyUserId?: string }) => void;
     isPending: boolean;
   };
   judgeAnswer?: {
@@ -62,6 +62,7 @@ interface UseGameExecutorParams {
   context?: {
     playerId?: string;
     currentRound?: number;
+    spotifyUserId?: string; // For leaderboard tracking
   };
 }
 
@@ -109,7 +110,7 @@ export function useGameExecutor({ sessionId, mutations, context }: UseGameExecut
             console.warn('startGame mutation not available');
             break;
           }
-          return mutations.startGame.mutate(sessionId);
+          return mutations.startGame.mutate({ sessionId, spotifyUserId: context?.spotifyUserId });
 
         case 'judge_answer':
           if (!mutations.judgeAnswer) {

@@ -388,6 +388,7 @@ export type Database = {
           genres_backup: string[] | null
           id: string
           isrc: string | null
+          popularity_score: number | null
           primary_genre_backup: string | null
           release_year: number | null
           spotify_id: string
@@ -402,6 +403,7 @@ export type Database = {
           genres_backup?: string[] | null
           id?: string
           isrc?: string | null
+          popularity_score?: number | null
           primary_genre_backup?: string | null
           release_year?: number | null
           spotify_id: string
@@ -416,6 +418,7 @@ export type Database = {
           genres_backup?: string[] | null
           id?: string
           isrc?: string | null
+          popularity_score?: number | null
           primary_genre_backup?: string | null
           release_year?: number | null
           spotify_id?: string

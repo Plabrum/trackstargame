@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import type { Tables } from '@/lib/types/database';
 
 export function useHostGame(sessionId: string) {
-  const { accessToken } = useSpotifyAuth();
+  const { accessToken, user } = useSpotifyAuth();
   const [answerFeedback, setAnswerFeedback] = useState<{
     isCorrect: boolean;
     correctAnswer: string;
@@ -100,6 +100,9 @@ export function useHostGame(sessionId: string) {
       revealAnswer,
       endGame,
       resetGame,
+    },
+    context: {
+      spotifyUserId: user.id, // Pass Spotify user ID for leaderboard tracking
     },
   });
 
