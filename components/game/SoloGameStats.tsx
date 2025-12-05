@@ -6,6 +6,7 @@ import type { Tables } from "@/lib/types/database";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSpotifyAuth } from "@/lib/spotify-auth-context";
 import { useTrack, useSpotifyAlbumArt } from "@/hooks/queries/use-game";
+import { SpotifyTrackLink } from "@/components/shared/SpotifyTrackLink";
 
 type GameRound = Tables<'game_rounds'>;
 
@@ -156,7 +157,10 @@ export function SoloGameStats({ rounds, finalScore }: SoloGameStatsProps) {
 
                   {/* Track Info */}
                   <div className="flex-1">
-                    <p className="font-bold text-lg">{bestRoundTrack.title}</p>
+                    <p className="font-bold text-lg flex items-center gap-2">
+                      {bestRoundTrack.title}
+                      <SpotifyTrackLink spotifyId={bestRoundTrack.spotify_id} />
+                    </p>
                     <p className="text-sm text-muted-foreground">{bestRoundTrack.artist}</p>
                     <div className="mt-2 flex gap-4 text-sm">
                       <div>

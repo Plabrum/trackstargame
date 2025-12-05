@@ -169,6 +169,17 @@ class SpotifyClient:
             artist_ids = [artist['id'] for artist in track['artists']]
             artist_names = [artist['name'] for artist in track['artists']]
 
+            # Get album image (prefer 300x300, fall back to largest available)
+            album_images = track['album'].get('images', [])
+            album_image_url = None
+            if album_images:
+                # Images are sorted by size (largest first)
+                # Prefer medium size (300x300) if available, otherwise use largest
+                if len(album_images) >= 2:
+                    album_image_url = album_images[1]['url']  # Medium (usually 300x300)
+                else:
+                    album_image_url = album_images[0]['url']  # Largest available
+
             return {
                 'title': track['name'],
                 'artist': ', '.join(artist_names),  # For backwards compatibility
@@ -176,6 +187,7 @@ class SpotifyClient:
                 'artist_names': artist_names,  # NEW: List of artist names
                 'spotify_id': track['id'],
                 'album': track['album']['name'],
+                'album_image_url': album_image_url,  # NEW: Album artwork URL
                 'release_date': track['album']['release_date'],
                 'release_year': self._extract_year(track['album']['release_date']),
                 'primary_genre': self._get_primary_genre(artist_ids),
@@ -253,6 +265,17 @@ class SpotifyClient:
                     artist_ids = [artist['id'] for artist in track['artists']]
                     artist_names = [artist['name'] for artist in track['artists']]
 
+                    # Get album image (prefer 300x300, fall back to largest available)
+                    album_images = track['album'].get('images', [])
+                    album_image_url = None
+                    if album_images:
+                        # Images are sorted by size (largest first)
+                        # Prefer medium size (300x300) if available, otherwise use largest
+                        if len(album_images) >= 2:
+                            album_image_url = album_images[1]['url']  # Medium (usually 300x300)
+                        else:
+                            album_image_url = album_images[0]['url']  # Largest available
+
                     tracks.append({
                         'title': track['name'],
                         'artist': ', '.join(artist_names),  # For backwards compatibility
@@ -260,6 +283,7 @@ class SpotifyClient:
                         'artist_names': artist_names,  # NEW: List of artist names
                         'spotify_id': track['id'],
                         'album': track['album']['name'],
+                        'album_image_url': album_image_url,  # NEW: Album artwork URL
                         'release_date': track['album']['release_date'],
                         'release_year': self._extract_year(track['album']['release_date']),
                         'primary_genre': self._get_primary_genre(artist_ids),

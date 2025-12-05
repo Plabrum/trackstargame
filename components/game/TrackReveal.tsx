@@ -3,11 +3,13 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle } from "lucide-react";
 import Image from "next/image";
+import { SpotifyTrackLink } from "@/components/shared/SpotifyTrackLink";
 
 interface TrackRevealProps {
   trackTitle: string;
   artistName: string;
   albumArt?: string | null;
+  spotifyId?: string | null;
   // Optional answer feedback
   answerFeedback?: {
     isCorrect: boolean;
@@ -19,6 +21,7 @@ export function TrackReveal({
   trackTitle,
   artistName,
   albumArt,
+  spotifyId,
   answerFeedback,
 }: TrackRevealProps) {
   const borderColor = answerFeedback
@@ -62,7 +65,10 @@ export function TrackReveal({
               )}
               <div className="flex-1">
                 <p className="text-xl md:text-2xl font-bold text-gray-950">{artistName}</p>
-                <p className="text-base md:text-lg text-gray-700">{trackTitle}</p>
+                <p className="text-base md:text-lg text-gray-700 flex items-center gap-2">
+                  {trackTitle}
+                  <SpotifyTrackLink spotifyId={spotifyId} />
+                </p>
               </div>
             </div>
             {answerFeedback && (

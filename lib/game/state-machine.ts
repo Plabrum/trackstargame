@@ -10,6 +10,9 @@ export type GameState = 'lobby' | 'playing' | 'buzzed' | 'submitted' | 'reveal' 
 // User roles
 export type Role = 'host' | 'player';
 
+// Difficulty levels for track selection
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'legendary';
+
 // All possible game actions (state machine decides which are available based on role/state)
 export type GameAction =
   // Host actions
@@ -30,6 +33,7 @@ export type GameSettings = {
   allow_host_to_play?: boolean;
   enable_text_input_mode?: boolean;
   total_rounds?: number;
+  difficulty?: Difficulty;
 };
 
 // Action descriptor with metadata for UI rendering

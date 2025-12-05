@@ -47,6 +47,7 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
   const [gameMode, setGameMode] = useState<'solo' | 'party'>(initialGameMode);
   const [partyTextInput, setPartyTextInput] = useState(session.enable_text_input_mode ?? false);
   const [partyHostPlays, setPartyHostPlays] = useState(session.allow_host_to_play);
+  const [difficulty, setDifficulty] = useState(session.difficulty || 'medium');
 
   // Mutation for updating settings
   const updateSettings = useUpdateSettings();
@@ -107,6 +108,8 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
         onPartyTextInputChange={setPartyTextInput}
         partyHostPlays={partyHostPlays}
         onPartyHostPlaysChange={setPartyHostPlays}
+        difficulty={difficulty}
+        onDifficultyChange={setDifficulty}
       />
 
       {/* Party Mode: Show QR Code & Players */}
@@ -223,6 +226,7 @@ export function HostLobby({ session, players, onStartGame, isStarting, isSpotify
                 totalRounds,
                 allowHostToPlay,
                 enableTextInputMode,
+                difficulty,
               });
 
               console.log('Settings updated successfully:', updatedSession);

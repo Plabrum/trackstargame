@@ -16,7 +16,7 @@ interface GameStateDisplayProps {
   state: GameSession['state'];
   buzzerPlayer?: Player | null;
   elapsedSeconds?: number | null;
-  currentTrack?: { title: string; artist: string } | null;
+  currentTrack?: { title: string; artist: string; album_image_url?: string | null; spotify_id?: string | null } | null;
   playbackState?: SpotifyPlayerState | null;
   answerFeedback?: {
     isCorrect: boolean;
@@ -99,7 +99,8 @@ export function GameStateDisplay({
             <TrackReveal
               trackTitle={currentTrack.title}
               artistName={currentTrack.artist}
-              albumArt={playbackState?.track?.albumArt}
+              albumArt={currentTrack.album_image_url}
+              spotifyId={currentTrack.spotify_id}
               answerFeedback={
                 answerFeedback
                   ? {

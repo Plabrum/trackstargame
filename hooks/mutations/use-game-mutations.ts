@@ -393,6 +393,7 @@ export function useUpdateSettings() {
       allowHostToPlay: boolean;
       enableTextInputMode: boolean;
       totalRounds: number;
+      difficulty: string;
     }) => {
       const { data, error } = await supabase
         .from('game_sessions')
@@ -400,6 +401,7 @@ export function useUpdateSettings() {
           allow_host_to_play: params.allowHostToPlay,
           enable_text_input_mode: params.enableTextInputMode,
           total_rounds: params.totalRounds,
+          difficulty: params.difficulty,
         })
         .eq('id', params.sessionId)
         .eq('state', 'lobby')

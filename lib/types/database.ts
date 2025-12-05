@@ -133,6 +133,7 @@ export type Database = {
           allow_host_to_play: boolean
           created_at: string | null
           current_round: number | null
+          difficulty: string | null
           enable_text_input_mode: boolean
           host_name: string
           id: string
@@ -146,6 +147,7 @@ export type Database = {
           allow_host_to_play?: boolean
           created_at?: string | null
           current_round?: number | null
+          difficulty?: string | null
           enable_text_input_mode?: boolean
           host_name: string
           id?: string
@@ -159,6 +161,7 @@ export type Database = {
           allow_host_to_play?: boolean
           created_at?: string | null
           current_round?: number | null
+          difficulty?: string | null
           enable_text_input_mode?: boolean
           host_name?: string
           id?: string
@@ -532,6 +535,10 @@ export type Database = {
           session_id: string
           track_id: string
         }[]
+      }
+      calculate_track_popularity_score: {
+        Args: { p_track_id: string }
+        Returns: number
       }
       finalize_judgments: {
         Args: { p_overrides?: Json; p_session_id: string }

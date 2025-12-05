@@ -97,6 +97,7 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
                 track['spotify_id'],
                 track['title'],
                 track.get('album_name'),
+                track.get('album_image_url'),
                 track.get('release_year'),
                 track.get('spotify_popularity'),
                 track.get('isrc')
@@ -107,12 +108,13 @@ def add_tracks_to_pack(pack_id: str, tracks: List[Dict[str, str]]) -> int:
         execute_values(
             cursor,
             """
-            INSERT INTO tracks (spotify_id, title, album_name, release_year, spotify_popularity, isrc)
+            INSERT INTO tracks (spotify_id, title, album_name, album_image_url, release_year, spotify_popularity, isrc)
             VALUES %s
             ON CONFLICT (spotify_id)
             DO UPDATE SET
                 title = EXCLUDED.title,
                 album_name = COALESCE(EXCLUDED.album_name, tracks.album_name),
+                album_image_url = COALESCE(EXCLUDED.album_image_url, tracks.album_image_url),
                 release_year = COALESCE(EXCLUDED.release_year, tracks.release_year),
                 spotify_popularity = COALESCE(EXCLUDED.spotify_popularity, tracks.spotify_popularity),
                 isrc = COALESCE(EXCLUDED.isrc, tracks.isrc),
@@ -342,13 +344,13 @@ def get_all_packs() -> List[Dict]:
 
 def get_pack_tracks(pack_id: str) -> List[Dict]:
     """
-    Get all tracks for a specific pack.
+    Get all tracks for a specific pack using normalized schema.
 
     Args:
         pack_id: UUID of the pack
 
     Returns:
-        List of track dicts with artist and genre data
+        List of track dicts with computed artist and genre data from normalized tables
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -356,12 +358,29 @@ def get_pack_tracks(pack_id: str) -> List[Dict]:
         cursor.execute(
             """
             SELECT
-                t.id, t.title, t.artist, t.spotify_id, t.release_year,
-                t.album_name, t.genres, t.created_at, t.primary_genre,
-                t.spotify_popularity, t.isrc
+                t.id, t.title, t.spotify_id, t.release_year,
+                t.album_name, t.spotify_popularity, t.isrc, t.created_at,
+                -- Aggregate artist names (comma-separated, ordered by position)
+                STRING_AGG(a.name, ', ' ORDER BY ta.position) as artist,
+                -- Aggregate all genres from all artists (as array)
+                ARRAY_AGG(DISTINCT genre ORDER BY genre) FILTER (WHERE genre IS NOT NULL) as genres,
+                -- Get first artist's first genre as primary_genre
+                (
+                    SELECT ar.genres[1]
+                    FROM track_artists tar
+                    JOIN artists ar ON ar.id = tar.artist_id
+                    WHERE tar.track_id = t.id
+                    ORDER BY tar.position
+                    LIMIT 1
+                ) as primary_genre
             FROM pack_tracks pt
-            JOIN tracks_with_artists t ON t.id = pt.track_id
+            JOIN tracks t ON t.id = pt.track_id
+            LEFT JOIN track_artists ta ON ta.track_id = t.id
+            LEFT JOIN artists a ON a.id = ta.artist_id
+            LEFT JOIN LATERAL unnest(a.genres) AS genre ON true
             WHERE pt.pack_id = %s
+            GROUP BY t.id, t.title, t.spotify_id, t.release_year,
+                     t.album_name, t.spotify_popularity, t.isrc, t.created_at
             ORDER BY pt.position
             """,
             (pack_id,)
@@ -372,15 +391,15 @@ def get_pack_tracks(pack_id: str) -> List[Dict]:
             tracks.append({
                 'id': row[0],
                 'title': row[1],
-                'artist': row[2],
-                'spotify_id': row[3],
-                'release_year': row[4],
-                'album_name': row[5],
-                'genres': row[6],
+                'spotify_id': row[2],
+                'release_year': row[3],
+                'album_name': row[4],
+                'spotify_popularity': row[5],
+                'isrc': row[6],
                 'created_at': row[7],
-                'primary_genre': row[8],
-                'spotify_popularity': row[9],
-                'isrc': row[10]
+                'artist': row[8] or 'Unknown Artist',
+                'genres': row[9] or [],
+                'primary_genre': row[10]
             })
 
         cursor.close()

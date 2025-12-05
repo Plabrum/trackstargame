@@ -41,7 +41,7 @@ interface PlayerGameViewProps {
   players: Player[];
   currentPlayerId: string;
   currentRound?: GameRound | null;
-  currentTrack?: { title: string; artist: string } | null;
+  currentTrack?: { title: string; artist: string; album_image_url?: string | null; spotify_id?: string | null } | null;
   buzzerPlayer?: Player | null;
   executeAction: (action: GameAction) => void;
   isActionLoading: (actionType: GameAction['type']) => boolean;
@@ -224,6 +224,8 @@ export function PlayerGameView({
               <TrackReveal
                 trackTitle={currentTrack.title}
                 artistName={currentTrack.artist}
+                albumArt={currentTrack.album_image_url}
+                spotifyId={currentTrack.spotify_id}
                 answerFeedback={feedbackForReveal}
               />
             )}

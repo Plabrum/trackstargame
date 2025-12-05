@@ -37,7 +37,7 @@ type RoundAnswer = Tables<'round_answers'>;
 interface GameData {
   session: GameSession;
   players: Player[];
-  currentTrack?: { title: string; artist: string; spotify_id: string } | null;
+  currentTrack?: { title: string; artist: string; spotify_id: string; album_image_url?: string | null } | null;
   currentRound?: GameRound | null;
   buzzerPlayer?: Player | null;
   elapsedSeconds?: number | null;

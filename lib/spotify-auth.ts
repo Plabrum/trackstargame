@@ -13,6 +13,7 @@ const SCOPES = [
   'streaming',
   'user-read-playback-state',
   'user-modify-playback-state',
+  'user-library-modify', // Save tracks to user's library
 ];
 
 /**

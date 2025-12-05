@@ -5,6 +5,7 @@ import { Trophy, Zap, TrendingUp, Users, Target, Clock } from "lucide-react";
 import type { Tables } from "@/lib/types/database";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrack, useSpotifyAlbumArt } from "@/hooks/queries/use-game";
+import { SpotifyTrackLink } from "@/components/shared/SpotifyTrackLink";
 
 type Player = Tables<'players'>;
 type GameRound = Tables<'game_rounds'>;
@@ -230,7 +231,10 @@ export function PartyGameHighlights({ players, rounds, accessToken }: PartyGameH
 
                 {/* Track Info */}
                 <div className="flex-1">
-                  <p className="font-bold text-lg">{bestRoundTrack.title}</p>
+                  <p className="font-bold text-lg flex items-center gap-2">
+                    {bestRoundTrack.title}
+                    <SpotifyTrackLink spotifyId={bestRoundTrack.spotify_id} />
+                  </p>
                   <p className="text-sm text-muted-foreground">{bestRoundTrack.artist}</p>
                   <div className="mt-2 flex flex-wrap gap-4 text-sm">
                     <div>

@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Settings, User, Users, KeyboardIcon } from "lucide-react";
+import { Settings, User, Users, KeyboardIcon, Gauge } from "lucide-react";
 import { useUpdateSettings } from "@/hooks/mutations/use-game-mutations";
 import { toast } from "sonner";
 import type { Tables } from "@/lib/types/database";
@@ -29,6 +29,8 @@ interface GameSettingsFormProps {
   onPartyTextInputChange?: (value: boolean) => void;
   partyHostPlays?: boolean;
   onPartyHostPlaysChange?: (value: boolean) => void;
+  difficulty?: string;
+  onDifficultyChange?: (value: string) => void;
 }
 
 export function GameSettingsForm({
@@ -44,6 +46,8 @@ export function GameSettingsForm({
   onPartyTextInputChange,
   partyHostPlays: controlledPartyHostPlays,
   onPartyHostPlaysChange,
+  difficulty: controlledDifficulty,
+  onDifficultyChange,
 }: GameSettingsFormProps) {
   const router = useRouter();
   const updateSettings = useUpdateSettings();
@@ -96,6 +100,18 @@ export function GameSettingsForm({
     }
   };
 
+  const [localDifficulty, setLocalDifficulty] = useState<string>(
+    session.difficulty || 'medium'
+  );
+  const difficulty = controlledDifficulty !== undefined ? controlledDifficulty : localDifficulty;
+  const handleDifficultyChange = (value: string) => {
+    if (onDifficultyChange) {
+      onDifficultyChange(value);
+    } else {
+      setLocalDifficulty(value);
+    }
+  };
+
   const handleContinue = async () => {
     try {
       // Derive backend settings from game mode
@@ -118,6 +134,7 @@ export function GameSettingsForm({
         allowHostToPlay,
         enableTextInputMode,
         totalRounds: parseInt(totalRoundsStr),
+        difficulty,
       });
 
       toast.success("Settings saved!", {
@@ -185,6 +202,51 @@ export function GameSettingsForm({
                   <SelectItem value="20">20 Rounds</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Difficulty Level */}
+            <div className="space-y-2">
+              <Label htmlFor="difficulty" className="text-base font-semibold flex items-center gap-2">
+                <Gauge className="h-4 w-4" />
+                Difficulty Level
+              </Label>
+              <Select value={difficulty} onValueChange={handleDifficultyChange}>
+                <SelectTrigger id="difficulty" className="w-full">
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Easy</span>
+                      <span className="text-xs text-muted-foreground">Popular hits everyone knows</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medium">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Medium</span>
+                      <span className="text-xs text-muted-foreground">Balanced mix (recommended)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="hard">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Hard</span>
+                      <span className="text-xs text-muted-foreground">Deep cuts for music enthusiasts</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="legendary">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Legendary</span>
+                      <span className="text-xs text-muted-foreground">Ultra-obscure tracks - extreme challenge</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {difficulty === 'easy' && 'Great for casual players!'}
+                {difficulty === 'medium' && 'Balanced for most players.'}
+                {difficulty === 'hard' && 'For true music lovers.'}
+                {difficulty === 'legendary' && 'Only for experts!'}
+              </p>
             </div>
 
             {/* Party Mode Settings */}

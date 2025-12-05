@@ -32,7 +32,7 @@ interface PackSongsSheetProps {
 }
 
 export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps) {
-  // Fetch tracks for this pack using join query
+  // Fetch tracks for this pack using normalized schema
   const { data: tracks, isLoading } = useQuery({
     queryKey: ['pack_tracks', pack?.id],
     queryFn: async () => {
@@ -43,17 +43,21 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
         .from('pack_tracks')
         .select(`
           position,
-          track:tracks_with_artists (
+          track:tracks (
             id,
             title,
-            artist,
             spotify_id,
             album_name,
             release_year,
-            primary_genre,
-            genres,
             spotify_popularity,
-            isrc
+            isrc,
+            track_artists (
+              position,
+              artist:artists (
+                id,
+                name
+              )
+            )
           )
         `)
         .eq('pack_id', pack.id)
@@ -61,8 +65,23 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
 
       if (error) throw error;
 
-      // Transform response to extract track data
-      return data?.map((pt) => pt.track).filter(Boolean) || [];
+      // Transform response to extract track data and compute artist names
+      return data?.map((pt) => {
+        const track = pt.track;
+        if (!track) return null;
+
+        // Compute comma-separated artist names from track_artists
+        const artists = track.track_artists
+          ?.sort((a, b) => a.position - b.position)
+          .map(ta => ta.artist?.name)
+          .filter(Boolean)
+          .join(', ') || 'Unknown Artist';
+
+        return {
+          ...track,
+          artist: artists,
+        };
+      }).filter(Boolean) || [];
     },
     enabled: !!pack?.id && open,
   });
@@ -106,37 +125,41 @@ export function PackSongsSheet({ pack, open, onOpenChange }: PackSongsSheetProps
               {/* Track list */}
               <ScrollArea className="h-[calc(100vh-200px)]">
                 <div className="space-y-2">
-                  {tracks.map((track, index) => (
-                    <div
-                      key={track.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:bg-card/80 transition-colors"
-                    >
-                      {/* Track number */}
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange/20 text-orange font-semibold text-sm flex-shrink-0">
-                        {index + 1}
-                      </div>
+                  {tracks.map((track, index) => {
+                    if (!track) return null;
 
-                      {/* Track info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {track.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {track.artist}
-                        </p>
-                      </div>
-
-                      {/* Spotify indicator */}
-                      {track.spotify_id && (
-                        <div className="flex-shrink-0">
-                          <Badge variant="outline" className="text-xs">
-                            <Music className="h-3 w-3 mr-1 text-green-600" />
-                            Spotify
-                          </Badge>
+                    return (
+                      <div
+                        key={track.id}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:bg-card/80 transition-colors"
+                      >
+                        {/* Track number */}
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange/20 text-orange font-semibold text-sm flex-shrink-0">
+                          {index + 1}
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* Track info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {track.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {track.artist}
+                          </p>
+                        </div>
+
+                        {/* Spotify indicator */}
+                        {track.spotify_id && (
+                          <div className="flex-shrink-0">
+                            <Badge variant="outline" className="text-xs">
+                              <Music className="h-3 w-3 mr-1 text-green-600" />
+                              Spotify
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </>

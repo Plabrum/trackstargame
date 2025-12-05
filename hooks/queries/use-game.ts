@@ -13,7 +13,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 type GameSession = TableRow<'game_sessions'>;
 type Player = TableRow<'players'>;
 type GameRound = TableRow<'game_rounds'>;
-type Track = TableRow<'tracks'>;
+type Track = TableRow<'tracks'> & { artist: string }; // Extended with computed artist field
 
 /**
  * Fetch a game session with real-time updates.
@@ -37,7 +37,7 @@ export function useGameSession(sessionId: string): UseQueryResult<GameSession | 
       return data as GameSession;
     },
     staleTime: 0, // Always consider data stale for immediate updates
-    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
+    refetchInterval: 2000, // Poll every 2 seconds as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -90,7 +90,7 @@ export function useGamePlayers(sessionId: string): UseQueryResult<Player[], Erro
     },
     staleTime: 0, // Always consider data stale for immediate updates
     refetchOnMount: true, // Refetch when component mounts
-    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
+    refetchInterval: 2000, // Poll every 2 seconds as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -144,7 +144,6 @@ export function useGameRounds(sessionId: string): UseQueryResult<GameRound[], Er
       return data as GameRound[];
     },
     staleTime: 0, // Always consider data stale for immediate updates
-    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
@@ -191,7 +190,15 @@ export function useTrack(trackId: string | null): UseQueryResult<Track | null, E
 
       const { data, error } = await supabase
         .from('tracks')
-        .select('*')
+        .select(`
+          *,
+          track_artists (
+            position,
+            artist:artists (
+              name
+            )
+          )
+        `)
         .eq('id', trackId)
         .single();
 
@@ -200,7 +207,17 @@ export function useTrack(trackId: string | null): UseQueryResult<Track | null, E
         return null;
       }
 
-      return data as Track;
+      // Compute comma-separated artist names from track_artists
+      const artists = data.track_artists
+        ?.sort((a, b) => a.position - b.position)
+        .map(ta => ta.artist?.name)
+        .filter(Boolean)
+        .join(', ') || 'Unknown Artist';
+
+      return {
+        ...data,
+        artist: artists,
+      } as Track;
     },
     enabled: !!trackId,
     staleTime: Infinity, // Track data doesn't change, cache indefinitely
@@ -245,7 +262,6 @@ export function useRoundAnswers(sessionId: string | null, roundNumber: number | 
     },
     enabled: !!sessionId && !!roundNumber,
     staleTime: 0, // Always consider data stale for immediate updates
-    refetchInterval: 1000, // Poll every second as fallback for lost websocket messages
   });
 
   // Subscribe to real-time updates
