@@ -9,7 +9,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { PackCard } from "./PackCard";
-import { PackSongsSheet } from "./PackSongsSheet";
+import { PackDetailsSheet } from "./PackDetailsSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,8 @@ export function PackGalleryContent({
   processingPackId = null,
 }: PackGalleryContentProps) {
   const [selectedPack, setSelectedPack] = useState<Pack | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<'songs' | 'leaderboard'>('songs');
   const [searchQuery, setSearchQuery] = useState("");
   const hasShownErrorToast = useRef(false);
 
@@ -100,9 +101,10 @@ export function PackGalleryContent({
     });
   }, [packs, searchQuery]);
 
-  const handleViewSongs = (pack: Pack) => {
+  const handleViewDetails = (pack: Pack, tab: 'songs' | 'leaderboard') => {
     setSelectedPack(pack);
-    setSheetOpen(true);
+    setSelectedTab(tab);
+    setDetailsSheetOpen(true);
   };
 
   // Loading state
@@ -171,7 +173,7 @@ export function PackGalleryContent({
             key={pack.id}
             pack={pack}
             trackCount={pack.track_count ?? 0}
-            onViewSongs={() => handleViewSongs(pack)}
+            onViewDetails={(tab) => handleViewDetails(pack, tab)}
             onStartGame={() => onPackAction(pack.id)}
             isStarting={isProcessing && processingPackId === pack.id}
             actionLabel={actionLabel}
@@ -179,11 +181,12 @@ export function PackGalleryContent({
         ))}
       </div>
 
-      {/* Songs Sheet */}
-      <PackSongsSheet
+      {/* Details Sheet with Tabs */}
+      <PackDetailsSheet
         pack={selectedPack}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        open={detailsSheetOpen}
+        onOpenChange={setDetailsSheetOpen}
+        initialTab={selectedTab}
       />
     </>
   );

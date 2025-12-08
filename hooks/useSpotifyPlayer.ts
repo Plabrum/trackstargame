@@ -139,8 +139,15 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
         } else {
           console.log('[Spotify] No active playback to transfer');
         }
-      } catch (err) {
-        // Ignore errors - maybe no active playback, which is fine
+      } catch (err: any) {
+        // Handle token expiration (401)
+        if (err.status === 401) {
+          console.error('[Spotify] Token expired (401)');
+          setError('Your session has expired. Please refresh the page.');
+          options.onError?.('Your session has expired. Please refresh the page.');
+          return;
+        }
+        // Ignore other errors - maybe no active playback, which is fine
         console.log('[Spotify] Error checking playback state:', err);
       }
 
@@ -261,7 +268,10 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
         const playbackState = await api.player.getPlaybackState();
         activeDeviceId = playbackState?.device?.id ?? undefined;
         console.log('[Spotify] Current active device:', activeDeviceId, 'Our device:', deviceIdRef.current);
-      } catch (err) {
+      } catch (err: any) {
+        if (err.status === 401) {
+          throw new Error('Token expired - please refresh the page');
+        }
         console.log('[Spotify] Could not get playback state, will attempt playback anyway:', err);
       }
 
@@ -310,24 +320,25 @@ export function useSpotifyPlayer(options: UseSpotifyPlayerOptions): UseSpotifyPl
         } catch (err: any) {
           lastError = err;
 
-          // Check if it's a retryable error
-          const is404 = err.message?.includes('404') || err.status === 404;
-          const is429 = err.message?.includes('429') || err.status === 429; // Rate limit
-          const is5xx = err.status >= 500 && err.status < 600; // Server errors
-          const isNetworkError = err.message?.toLowerCase().includes('network') ||
-                                 err.message?.toLowerCase().includes('fetch');
+          // Don't retry auth errors - token is expired
+          if (err.status === 401) {
+            throw new Error('Token expired - please refresh the page');
+          }
 
-          const isRetryable = is404 || is429 || is5xx || isNetworkError;
+          // Retry on transient errors
+          const isRetryable =
+            err.status === 404 || // Device not found
+            err.status === 429 || // Rate limit
+            err.status >= 500 ||  // Server errors
+            !err.status;          // Network errors
 
           if (isRetryable && attempt < maxRetries - 1) {
-            // Wait before retrying (exponential backoff: 500ms, 1000ms, 2000ms)
             const delay = 500 * Math.pow(2, attempt);
             console.log(`[Spotify] Retryable error (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`, err);
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
 
-          // If it's not retryable or we've exhausted retries, throw
           break;
         }
       }

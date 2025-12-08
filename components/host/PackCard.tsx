@@ -10,7 +10,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Music, Play, ListMusic } from "lucide-react";
+import { Music, Play, ListMusic, Trophy } from "lucide-react";
 import type { Tables } from "@/lib/types/database";
 
 type Pack = Tables<'packs'>;
@@ -18,7 +18,7 @@ type Pack = Tables<'packs'>;
 interface PackCardProps {
   pack: Pack;
   trackCount: number;
-  onViewSongs: () => void;
+  onViewDetails: (tab: 'songs' | 'leaderboard') => void;
   onStartGame: () => void;
   isStarting?: boolean;
   actionLabel?: string;
@@ -27,7 +27,7 @@ interface PackCardProps {
 export function PackCard({
   pack,
   trackCount,
-  onViewSongs,
+  onViewDetails,
   onStartGame,
   isStarting = false,
   actionLabel = "Start Game",
@@ -64,14 +64,24 @@ export function PackCard({
         )}
       </CardHeader>
       <CardContent className="space-y-2">
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={onViewSongs}
-        >
-          <ListMusic className="h-4 w-4 mr-2" />
-          View Songs
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => onViewDetails('songs')}
+          >
+            <ListMusic className="h-4 w-4 mr-2" />
+            Songs
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => onViewDetails('leaderboard')}
+          >
+            <Trophy className="h-4 w-4 mr-2" />
+            Leaderboard
+          </Button>
+        </div>
         <Button
           className="w-full"
           onClick={onStartGame}
